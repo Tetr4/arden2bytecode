@@ -34,6 +34,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -46,6 +47,8 @@ public final class ClassFileWriter {
 
 	private int this_class;
 	private int super_class;
+	private String sourceFileName;
+	private List<Annotation> annotations = new ArrayList<>();
 
 	/** Creates a new ClassFileWriter for writing the specified class */
 	public ClassFileWriter(String className, Class<?> superClass) {
@@ -55,7 +58,23 @@ public final class ClassFileWriter {
 		super_class = pool.getClass(superClass);
 	}
 
-	private String sourceFileName;
+	public void addAnnotation(Annotation annotation) {
+		annotations.add(annotation);
+		if (annotations.size() > 65535) {
+			throw new ClassFileLimitExceededException("Too many annotations.");
+		}
+	}
+
+	private byte[] getAnnotationData(List<Annotation> annotations) throws IOException {
+		ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+		DataOutputStream data = new DataOutputStream(byteOutputStream);
+		data.writeShort(annotations.size()); // num_annotations
+		for (Annotation annotation : annotations) {
+			annotation.save(data, pool);
+		}
+		data.flush();
+		return byteOutputStream.toByteArray();
+	}
 
 	/** Sets the source file name used for the debugger */
 	public void setSourceFileName(String sourceFileName) {
@@ -76,8 +95,8 @@ public final class ClassFileWriter {
 		}
 
 		void save(DataOutput output) throws IOException {
-			output.writeShort(nameIndex);
-			output.writeInt(data.length);
+			output.writeShort(nameIndex); // attribute_name_index
+			output.writeInt(data.length); // attribute_length
 			output.write(data);
 		}
 	}
@@ -117,22 +136,46 @@ public final class ClassFileWriter {
 		int descriptor_index;
 		MethodWriter writer;
 		AttributeInfo codeAttribute;
+		AttributeInfo annotationAttribute;
 
-		MethodInfo(String name, int modifiers, Class<?>[] parameters, Class<?> returnType) {
+		MethodInfo(String name, int modifiers, Class<?>[] parameters, Class<?> returnType, Annotation[] annotations) {
 			writer = new MethodWriter(pool, (modifiers & Modifier.STATIC) != Modifier.STATIC, parameters.length);
 			access_flags = (short) modifiers;
 			name_index = pool.getUtf8(name);
 			descriptor_index = pool.getUtf8(ConstantPool.createMethodDescriptor(parameters, returnType));
+
 			codeAttribute = new AttributeInfo("Code");
+
+			if (annotations.length > 65535) {
+				throw new ClassFileLimitExceededException("Too many annotations.");
+			}
+
+			if (annotations.length != 0) {
+				try {
+					annotationAttribute = new AttributeInfo("RuntimeVisibleAnnotations");
+					annotationAttribute.data = getAnnotationData(Arrays.asList(annotations));
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
 		}
 
 		void save(DataOutput output) throws IOException {
 			output.writeShort(access_flags);
 			output.writeShort(name_index);
 			output.writeShort(descriptor_index);
-			output.writeShort(1); // attributes_count
+
 			codeAttribute.data = writer.getCodeAttributeData();
-			codeAttribute.save(output);
+
+			List<AttributeInfo> attributes = new ArrayList<>();
+			attributes.add(codeAttribute);
+			if (annotationAttribute != null) {
+				attributes.add(annotationAttribute);
+			}
+			output.writeShort(attributes.size());
+			for (AttributeInfo attr : attributes) {
+				attr.save(output);
+			}
 		}
 	}
 
@@ -141,13 +184,19 @@ public final class ClassFileWriter {
 
 	List<MethodInfo> methods = new ArrayList<MethodInfo>();
 
-	/** Creates a new method in the class */
-	public MethodWriter createMethod(String name, int modifiers, Class<?>[] parameters, Class<?> returnType) {
+	/** Creates a new annotated method in the class */
+	public MethodWriter createMethod(String name, int modifiers, Class<?>[] parameters, Class<?> returnType,
+			Annotation[] annotations) {
 		if (methods.size() >= 65534)
 			throw new ClassFileLimitExceededException("Too many methods.");
-		MethodInfo info = new MethodInfo(name, modifiers, parameters, returnType);
+		MethodInfo info = new MethodInfo(name, modifiers, parameters, returnType, annotations);
 		methods.add(info);
 		return info.writer;
+	}
+
+	/** Creates a new method in the class */
+	public MethodWriter createMethod(String name, int modifiers, Class<?>[] parameters, Class<?> returnType) {
+		return createMethod(name, modifiers, parameters, returnType, new Annotation[] {});
 	}
 
 	public MethodWriter createConstructor(int modifiers, Class<?>[] parameters) {
@@ -155,7 +204,8 @@ public final class ClassFileWriter {
 	}
 
 	public MethodWriter createStaticInitializer() {
-		return createMethod(JAVA_STATIC_INITIALIZER_NAME, Modifier.PUBLIC | Modifier.STATIC, new Class<?>[0], Void.TYPE);
+		return createMethod(JAVA_STATIC_INITIALIZER_NAME, Modifier.PUBLIC | Modifier.STATIC, new Class<?>[0],
+				Void.TYPE);
 	}
 
 	/** Saves the class file to disk */
@@ -171,6 +221,7 @@ public final class ClassFileWriter {
 	/** Saves the class file */
 	public void save(DataOutput output) throws IOException {
 		ArrayList<AttributeInfo> attributes = new ArrayList<AttributeInfo>();
+
 		// attributes must be created before constant pool is saved
 		if (sourceFileName != null) {
 			AttributeInfo sourceFile = new AttributeInfo("SourceFile");
@@ -180,6 +231,11 @@ public final class ClassFileWriter {
 			data.flush();
 			sourceFile.data = byteOutputStream.toByteArray();
 			attributes.add(sourceFile);
+		}
+		if (!annotations.isEmpty()) {
+			AttributeInfo annotationAttribute = new AttributeInfo("RuntimeVisibleAnnotations");
+			annotationAttribute.data = getAnnotationData(annotations);
+			attributes.add(annotationAttribute);
 		}
 
 		// Write the class file

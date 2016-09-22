@@ -38,6 +38,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.junit.Assert;
+
 import arden.codegenerator.FieldReference;
 import arden.codegenerator.Label;
 import arden.codegenerator.MethodWriter;
@@ -149,12 +151,15 @@ public final class Compiler {
 				.getLine());
 		if (isDebuggingEnabled)
 			codeGen.enableDebugging(sourceFileName);
-		
+
 		compileData(codeGen, knowledge.getDataSlot());
 		compileLogic(codeGen, knowledge.getLogicSlot());
 		compileAction(codeGen, knowledge.getActionSlot());
 		compileEvoke(codeGen, knowledge.getEvokeSlot());
 		compileUrgency(codeGen, knowledge.getUrgencySlot());
+
+		compileValidation(codeGen); // TODO syntaxtree node as param
+
 		try {
 			compileMaintenance(codeGen, metadata.maintenance);
 			compileLibrary(codeGen, metadata.library);
@@ -166,7 +171,7 @@ public final class Compiler {
 		}
 
 		codeGen.createGetValue();
-			
+
 		byte[] data;
 		try {
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -326,6 +331,25 @@ public final class Compiler {
 			context.writer.returnDoubleFromFunction();
 		}
 		return urgency;
+	}
+
+	private void compileValidation(CodeGenerator codeGen) {
+		// TODO parse syntax tree
+		for (int i = 0; i < 10; i++) {
+			CompilerContext context = codeGen.createScenario("Scenario: " + i, i);
+			// scenario.apply(new ValidationCompiler(context));
+
+			try {
+				Method assertTrue = Assert.class.getMethod("assertTrue", Boolean.TYPE);
+				context.writer.loadIntegerConstant(i % 2); // true false true
+															// false ...
+				context.writer.invokeStatic(assertTrue);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+
+			context.writer.returnFromProcedure();
+		}
 	}
 
 	static Method getRuntimeHelper(String name, Class<?>... parameterTypes) {

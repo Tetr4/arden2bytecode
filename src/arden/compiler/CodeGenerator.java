@@ -35,6 +35,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import arden.codegenerator.Annotation;
 import arden.codegenerator.ClassFileWriter;
 import arden.codegenerator.FieldReference;
 import arden.codegenerator.Label;
@@ -51,6 +55,8 @@ import arden.runtime.MaintenanceMetadata;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.MedicalLogicModuleImplementation;
 import arden.runtime.evoke.Trigger;
+import arden.runtime.validation.Scenario;
+import arden.runtime.validation.ScenarioRunner;
 
 /**
  * This class is responsible for generating the
@@ -168,8 +174,13 @@ final class CodeGenerator {
 	private final int lineNumberForStaticInitializationSequencePoint;
 
 	public CodeGenerator(String mlmName, int lineNumberForStaticInitializationSequencePoint) {
-		this.classFileWriter = new ClassFileWriter(mlmName, MedicalLogicModuleImplementation.class);
 		this.lineNumberForStaticInitializationSequencePoint = lineNumberForStaticInitializationSequencePoint;
+		this.classFileWriter = new ClassFileWriter(mlmName, MedicalLogicModuleImplementation.class);
+
+		Annotation runwith = new Annotation(RunWith.class);
+		runwith.addValue("value", ScenarioRunner.class);
+		classFileWriter.addAnnotation(runwith);
+
 		createParameterLessConstructor();
 	}
 
@@ -187,10 +198,10 @@ final class CodeGenerator {
 	private int lineNumberForInitializationSequencePoint;
 
 	private MethodWriter parameterLessCtor;
-	
+
 	public CompilerContext createConstructor(int lineNumberForInitializationSequencePoint) {
-		ctor = classFileWriter.createConstructor(Modifier.PUBLIC, new Class<?>[] { ExecutionContext.class,
-				MedicalLogicModule.class, ArdenValue[].class });
+		ctor = classFileWriter.createConstructor(Modifier.PUBLIC,
+				new Class<?>[] { ExecutionContext.class, MedicalLogicModule.class, ArdenValue[].class });
 		this.lineNumberForInitializationSequencePoint = lineNumberForInitializationSequencePoint;
 		if (isDebuggingEnabled) {
 			ctor.enableLineNumberTable();
@@ -208,7 +219,7 @@ final class CodeGenerator {
 		ctor.mark(ctorUserCodeLabel);
 		return new CompilerContext(this, ctor, 3);
 	}
-	
+
 	public CompilerContext createParameterLessConstructor() {
 		parameterLessCtor = classFileWriter.createConstructor(Modifier.PUBLIC, new Class<?>[] {});
 		parameterLessCtor.loadThis();
@@ -244,44 +255,51 @@ final class CodeGenerator {
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 0);
 	}
-	
+
 	public CompilerContext createPriority() {
 		MethodWriter w = classFileWriter.createMethod("getPriority", Modifier.PUBLIC, new Class<?>[] {}, Double.TYPE);
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 0);
 	}
-	
+
 	public CompilerContext createMaintenance() {
-		MethodWriter w = classFileWriter.createMethod("getMaintenanceMetadata", Modifier.PUBLIC, new Class<?>[] {}, MaintenanceMetadata.class);
+		MethodWriter w = classFileWriter.createMethod("getMaintenanceMetadata", Modifier.PUBLIC, new Class<?>[] {},
+				MaintenanceMetadata.class);
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 0);
 	}
-	
+
 	public CompilerContext createLibrary() {
-		MethodWriter w = classFileWriter.createMethod("getLibraryMetadata", Modifier.PUBLIC, new Class<?>[] {}, LibraryMetadata.class);
+		MethodWriter w = classFileWriter.createMethod("getLibraryMetadata", Modifier.PUBLIC, new Class<?>[] {},
+				LibraryMetadata.class);
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 0);
 	}
-	
+
+	public CompilerContext createScenario(String name, int index) {
+		Annotation testAnnotation = new Annotation(Test.class);
+		Annotation scenarioAnnotation = new Annotation(Scenario.class);
+		scenarioAnnotation.addValue("value", name);
+		MethodWriter w = classFileWriter.createMethod("testScenario" + index, Modifier.PUBLIC, new Class<?>[] {},
+				Void.TYPE, new Annotation[] { testAnnotation, scenarioAnnotation });
+		if (isDebuggingEnabled)
+			w.enableLineNumberTable();
+		return new CompilerContext(this, w, 0);
+	}
+
 	public CompilerContext createTrigger() {
-		MethodWriter w = classFileWriter.createMethod(
-				"getTrigger", 
-				Modifier.PUBLIC, 
-				new Class<?>[] { ExecutionContext.class }, 
-				Trigger.class);
+		MethodWriter w = classFileWriter.createMethod("getTrigger", Modifier.PUBLIC,
+				new Class<?>[] { ExecutionContext.class }, Trigger.class);
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 1);
 	}
-	
+
 	public void createGetValue() {
-		MethodWriter w = classFileWriter.createMethod(
-				"getValue", 
-				Modifier.PUBLIC, 
-				new Class<?>[]{ String.class }, 
+		MethodWriter w = classFileWriter.createMethod("getValue", Modifier.PUBLIC, new Class<?>[] { String.class },
 				ArdenValue.class);
 		try {
 			Label excptBegin = new Label();
@@ -303,27 +321,27 @@ final class CodeGenerator {
 			w.checkCast(ArdenValue.class);
 			w.returnObjectFromFunction();
 			w.mark(excptEnd);
-			
+
 			w.markExceptionHandler(secHandler);
 			w.storeVariable(3);
 			w.jump(end);
-			
+
 			w.markExceptionHandler(noSuchFieldHandler);
 			w.storeVariable(3);
 			w.jump(end);
-			
+
 			w.markExceptionHandler(illegalArgHandler);
 			w.storeVariable(3);
 			w.jump(end);
-			
+
 			w.markExceptionHandler(illegalAccHandler);
 			w.storeVariable(3);
 			w.jump(end);
-			
+
 			w.mark(end);
 			w.loadNull();
 			w.returnObjectFromFunction();
-			
+
 			w.addExceptionInfo(excptBegin, excptEnd, noSuchFieldHandler, NoSuchFieldException.class);
 			w.addExceptionInfo(excptBegin, excptEnd, secHandler, SecurityException.class);
 			w.addExceptionInfo(excptBegin, excptEnd, illegalAccHandler, IllegalAccessException.class);
@@ -349,8 +367,8 @@ final class CodeGenerator {
 	private int formatFieldCount;
 
 	public FieldReference createStaticFinalField(Class<?> type) {
-		return classFileWriter.declareField("format$" + (++formatFieldCount), type, Modifier.PRIVATE | Modifier.STATIC
-				| Modifier.FINAL);
+		return classFileWriter.declareField("format$" + (++formatFieldCount), type,
+				Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
 	}
 
 	private ArrayList<FieldReference> fieldsNeedingInitialization = new ArrayList<FieldReference>();
@@ -365,7 +383,9 @@ final class CodeGenerator {
 		return f;
 	}
 
-	/** Gets the variable with the specified name, or null if it does not exist. */
+	/**
+	 * Gets the variable with the specified name, or null if it does not exist.
+	 */
 	public Variable getVariable(String name) {
 		return variables.get(name.toLowerCase(Locale.ENGLISH));
 	}
@@ -384,8 +404,8 @@ final class CodeGenerator {
 	/** Creates a new variable. */
 	public void addVariable(Variable var) {
 		if (getVariable(var.name) != null)
-			throw new RuntimeCompilerException(var.definitionPosition, "A variable with the name '" + var.name
-					+ "' already exists.");
+			throw new RuntimeCompilerException(var.definitionPosition,
+					"A variable with the name '" + var.name + "' already exists.");
 		variables.put(var.name.toLowerCase(Locale.ENGLISH), var);
 	}
 
@@ -401,7 +421,7 @@ final class CodeGenerator {
 			if (parameterLessCtor != null) {
 				parameterLessCtor.returnFromProcedure();
 			}
-			
+
 			if (staticInitializer != null)
 				staticInitializer.returnFromProcedure();
 
