@@ -87,6 +87,7 @@ Helpers
 
   nosemicr = [[printable + tab] - semicol];
   ttext  = [all - semicol]+ (semicol [all - semicol]+)*;
+  scenario_ttext  = [all - semicol]+;
   linktext = (nosemicr+ (semicol nosemicr+)* eol?)* nosemicr+ (semicol nosemicr+)*;
   simplestring = [all - '"']+;
   sstring = simplestring+ ('"' '"' simplestring+)*;
@@ -135,7 +136,7 @@ Helpers
   zero = '0';
 
 States
-  normal, text, mlmname, datamap, arden;
+  normal, text, mlmname, datamap, arden, scenario;
 
 
 //==============================================================================
@@ -156,7 +157,7 @@ Tokens
 
   // sequencing/binding
   comma      = ',';
-  semicolon  = ';';
+  {normal, scenario -> normal} semicolon  = ';';
   {normal -> text}colon      = ':';
   {normal, text -> normal, mlmname -> normal, arden->normal}semicolons = ';;';
   dot        = '.';
@@ -272,6 +273,7 @@ Tokens
   formatted   = f o r m a t t e d;
   from        = f r o m;
   ge          = g e;
+  given       = g i v e n;
   greater     = g r e a t e r;
   gt          = g t;
   hour        = h o u r;
@@ -362,6 +364,7 @@ Tokens
   right       = r i g h t;
   round       = r o u n d;
   same        = s a m e;
+  {normal->scenario} scenario    = s c e n a r i o ':';
   second      = s e c o n d;
   seconds     = s e c o n d s;
   select      = s e l e c t;
@@ -412,6 +415,7 @@ Tokens
   week        = w e e k;
   weeks       = w e e k s;
   were        = w e r e;
+  when        = w h e n;
   where       = w h e r e;
   while       = w h i l e;
   with        = w i t h;
@@ -433,6 +437,7 @@ Tokens
   blank = (sp | ht | ff | line_terminator)*;
 
   {text}text  = ttext;
+  {scenario} scenario_text = scenario_ttext;
 
   /****** lexical constructs ******/
 
@@ -487,6 +492,7 @@ mlm =
                 maintenance_category
                 library_category
                 knowledge_category
+                validation_category?
                 end_colon;
 
 maintenance_category =
@@ -524,6 +530,13 @@ knowledge_body =
                 logic_slot
                 action_slot
                 urgency_slot;
+
+validation_category =
+               validation_colon validation_body;
+
+validation_body =
+                scenario_slot*;
+
 
 /****** slots ******/
 /****** maintenance slots ******/
@@ -634,6 +647,63 @@ urgency_slot =
 urgency_val =
       {num}     number_literal
     | {id}      identifier;
+
+/****** validation slots ******/
+
+scenario_slot =
+      scenario scenario_text semicolon given_block semicolons;
+
+
+/****** validation block ******/
+
+/*
+ * Order:
+ *  1. single GIVEN statement + multiple AND statements
+ *  2. single WHEN statement + multiple AND statements
+ *  3. single THEN statement + multiple AND statements
+ * Steps may be skipped, but step order must be maintained.
+ * 
+ * Empty statements (" ;") are not allowed.
+ */
+
+given_block =
+      {gblk} given given_statement semicolon given_block_and
+    | {gstmt} given given_statement
+    | when_block;
+
+given_block_and =
+      {gblk} and given_statement semicolon given_block_and
+    | {gstmt} and given_statement
+    | when_block;
+
+when_block =
+      {wblk} when when_statement semicolon when_block_and
+    | {wstmt} when when_statement
+    | then_block;
+
+when_block_and =
+      {wblk} and when_statement semicolon when_block_and
+    | {wstmt} and when_statement
+    | then_block;
+
+then_block =
+      {tblk} then then_statement semicolon then_block_and
+    | {tstmt} then then_statement
+    | {empty};
+
+then_block_and =
+      {tblk} and then_statement semicolon then_block_and
+    | {tstmt} and then_statement
+    | {empty};
+
+given_statement = // TODO
+      ;
+
+when_statement = // TODO
+      ;
+
+then_statement = // TODO
+      ;
 
 /****** logic block ******/
 

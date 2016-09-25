@@ -73,6 +73,8 @@ final class CodeGenerator {
 	private final HashMap<String, Variable> variables = new HashMap<String, Variable>();
 	private int nextFieldIndex;
 	private boolean isFinished;
+	private boolean runWithAnnotationAdded = false;
+	private int scenarioNr = 0;
 	private FieldReference nowField;
 
 	private static final String literalPrefix = "$literal";
@@ -177,10 +179,6 @@ final class CodeGenerator {
 		this.lineNumberForStaticInitializationSequencePoint = lineNumberForStaticInitializationSequencePoint;
 		this.classFileWriter = new ClassFileWriter(mlmName, MedicalLogicModuleImplementation.class);
 
-		Annotation runwith = new Annotation(RunWith.class);
-		runwith.addValue("value", ScenarioRunner.class);
-		classFileWriter.addAnnotation(runwith);
-
 		createParameterLessConstructor();
 	}
 
@@ -279,14 +277,30 @@ final class CodeGenerator {
 		return new CompilerContext(this, w, 0);
 	}
 
-	public CompilerContext createScenario(String name, int index) {
+	public CompilerContext createScenario(String name) {
+		// add @RunWith(ScenarioRunner.class) annotation to class
+		if (!runWithAnnotationAdded) {
+			Annotation runwith = new Annotation(RunWith.class);
+			runwith.addValue("value", ScenarioRunner.class);
+			classFileWriter.addAnnotation(runwith);
+			runWithAnnotationAdded = true;
+		}
+
+		// create method annotated with @Test and @Scenario("description")
 		Annotation testAnnotation = new Annotation(Test.class);
 		Annotation scenarioAnnotation = new Annotation(Scenario.class);
 		scenarioAnnotation.addValue("value", name);
-		MethodWriter w = classFileWriter.createMethod("testScenario" + index, Modifier.PUBLIC, new Class<?>[] {},
-				Void.TYPE, new Annotation[] { testAnnotation, scenarioAnnotation });
+		String methodName = "testScenario" + scenarioNr++;
+		MethodWriter w = classFileWriter.createMethod(
+				methodName,
+				Modifier.PUBLIC,
+				new Class<?>[] {},
+				Void.TYPE,
+				new Annotation[] { testAnnotation, scenarioAnnotation });
+
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
+
 		return new CompilerContext(this, w, 0);
 	}
 

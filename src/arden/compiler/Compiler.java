@@ -36,9 +36,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
-
-import org.junit.Assert;
 
 import arden.codegenerator.FieldReference;
 import arden.codegenerator.Label;
@@ -52,13 +51,19 @@ import arden.compiler.node.AKnowledgeBody;
 import arden.compiler.node.AKnowledgeCategory;
 import arden.compiler.node.AMlm;
 import arden.compiler.node.ANumUrgencyVal;
+import arden.compiler.node.AScenarioSlot;
 import arden.compiler.node.AUrgUrgencySlot;
+import arden.compiler.node.AValidationBody;
+import arden.compiler.node.AValidationCategory;
 import arden.compiler.node.PActionSlot;
 import arden.compiler.node.PDataSlot;
 import arden.compiler.node.PEvokeSlot;
 import arden.compiler.node.PLogicSlot;
+import arden.compiler.node.PScenarioSlot;
 import arden.compiler.node.PUrgencySlot;
 import arden.compiler.node.PUrgencyVal;
+import arden.compiler.node.PValidationBody;
+import arden.compiler.node.PValidationCategory;
 import arden.compiler.node.Start;
 import arden.compiler.node.TIdentifier;
 import arden.compiler.node.TNumberLiteral;
@@ -136,6 +141,7 @@ public final class Compiler {
 	}
 
 	private CompiledMlm doCompileMlm(AMlm mlm) {
+		// collect metadata
 		MetadataCompiler metadata = new MetadataCompiler();
 		mlm.getMaintenanceCategory().apply(metadata);
 		mlm.getLibraryCategory().apply(metadata);
@@ -147,6 +153,7 @@ public final class Compiler {
 		// System.out.println(knowledge.toString());
 		// knowledge.apply(new PrintTreeVisitor(System.out));
 
+		// compile knowledge slots
 		CodeGenerator codeGen = new CodeGenerator(metadata.maintenance.getMlmName(), knowledgeCategory.getKnowledgeColon()
 				.getLine());
 		if (isDebuggingEnabled)
@@ -158,8 +165,14 @@ public final class Compiler {
 		compileEvoke(codeGen, knowledge.getEvokeSlot());
 		compileUrgency(codeGen, knowledge.getUrgencySlot());
 
-		compileValidation(codeGen); // TODO syntaxtree node as param
+		// compile validation
+		PValidationCategory validationCategory = mlm.getValidationCategory();
+		if (validationCategory != null) {
+			PValidationBody validation = ((AValidationCategory) validationCategory).getValidationBody();
+			compileValidation(codeGen, validation);
+		}
 
+		// compile metadata
 		try {
 			compileMaintenance(codeGen, metadata.maintenance);
 			compileLibrary(codeGen, metadata.library);
@@ -333,21 +346,13 @@ public final class Compiler {
 		return urgency;
 	}
 
-	private void compileValidation(CodeGenerator codeGen) {
-		// TODO parse syntax tree
-		for (int i = 0; i < 10; i++) {
-			CompilerContext context = codeGen.createScenario("Scenario: " + i, i);
-			// scenario.apply(new ValidationCompiler(context));
+	private void compileValidation(CodeGenerator codeGen, PValidationBody validation) {
+		LinkedList<PScenarioSlot> scenarios = ((AValidationBody) validation).getScenarioSlot();
+		for (PScenarioSlot scenario : scenarios) {
+			String description = ((AScenarioSlot) scenario).getScenarioText().getText();
 
-			try {
-				Method assertTrue = Assert.class.getMethod("assertTrue", Boolean.TYPE);
-				context.writer.loadIntegerConstant(i % 2); // true false true
-															// false ...
-				context.writer.invokeStatic(assertTrue);
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-
+			CompilerContext context = codeGen.createScenario(description);
+			scenario.apply(new ScenarioCompiler(context));
 			context.writer.returnFromProcedure();
 		}
 	}
