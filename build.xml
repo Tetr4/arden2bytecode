@@ -50,8 +50,6 @@
     </path>
     <fileset id="dist.libs" dir="${lib.dir}" includes="*.jar">
         <!-- exclude these libs from the generated jar -->
-        <exclude name="junit*.jar" />
-        <exclude name="hamcrest-core*.jar" />
         <exclude name="sqlite-jdbc*.jar" />
     </fileset>
     
