@@ -36,6 +36,9 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+
 import arden.MainClass;
 import arden.runtime.ArdenList;
 import arden.runtime.ArdenValue;
@@ -190,7 +193,12 @@ public final class CompiledMlm implements MedicalLogicModule {
 		} catch (Exception ex) {
 			throw new InvocationTargetException(ex);
 		}
-	}	
+	}
+	
+	@Override
+	public Result test(JUnitCore junit) {
+		return junit.run(loadClazz());
+	}
 	
 	/** use this method only to access static fields in the MLM implementation */
 	private MedicalLogicModuleImplementation getNonInitializedInstance() {

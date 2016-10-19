@@ -54,6 +54,10 @@ public interface CommandLineOptions {
 	@Option(shortName = "e",
 			description = "Run evoke engine that runs MLMs when they are triggered.")
 	boolean getEngine();
+	
+	@Option(shortName = "t",
+			description = "Test the MLM.")
+	boolean getTest();
 		
 	
 	// *** Control options ***

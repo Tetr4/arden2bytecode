@@ -29,8 +29,11 @@ package arden.runtime;
 
 import java.lang.reflect.InvocationTargetException;
 
-import arden.runtime.evoke.Trigger;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.RunListener;
 
+import arden.runtime.evoke.Trigger;
 
 /**
  * Represents a compiled medical logic module.
@@ -56,15 +59,32 @@ public interface MedicalLogicModule extends ArdenRunnable {
 
 	/** Gets the urgency value of this module. */
 	double getUrgency();
-	
-	/** Gets a trigger telling when to run this MLM 
-	 * @throws InvocationTargetException */
+
+	/**
+	 * Gets a trigger telling when to run this MLM
+	 * 
+	 * @throws InvocationTargetException
+	 */
 	Trigger getTrigger(ExecutionContext context, ArdenValue[] arguments) throws InvocationTargetException;
-	
+
 	/**
 	 * Gets the value of a variable declared in a Medical Logic Module
-	 * @param name Name of the value in the MLM
-	 * @return the variable value or null if the MLM has not been run yet or the value does not exist, or ArdenNull if the variable is not yet initialized
+	 * 
+	 * @param name
+	 *            Name of the value in the MLM
+	 * @return the variable value or null if the MLM has not been run yet or the
+	 *         value does not exist, or ArdenNull if the variable is not yet
+	 *         initialized
 	 */
 	ArdenValue getValue(String name);
+
+	/**
+	 * Tests this MLM by running the scenarios in the validation category.
+	 * 
+	 * @param junit
+	 *            The JUnit test facade, to which {@link RunListener}s can be
+	 *            attached.
+	 * @return a JUnit result
+	 */
+	Result test(JUnitCore junit);
 }

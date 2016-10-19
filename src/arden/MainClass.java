@@ -43,6 +43,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.junit.internal.TextListener;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+
 import com.lexicalscope.jewel.cli.ArgumentValidationException;
 import com.lexicalscope.jewel.cli.Cli;
 import com.lexicalscope.jewel.cli.CliFactory;
@@ -135,6 +139,8 @@ public class MainClass {
 		// check which mode (run, compile, engine) is selected
 		if (options.getRun()) {
 			return runFiles(inputFiles);
+		} else if (options.getTest()) {
+			return testFiles(inputFiles);
 		} else if (options.getCompile()) {
 			return compileFiles(inputFiles);
 		} else if (options.getEngine()) {
@@ -269,6 +275,32 @@ public class MainClass {
 			}
 		}
 		return true;
+	}
+	
+	public boolean testFiles(List<File> files) {
+		List<MedicalLogicModule> mlms;
+		try {
+			mlms = getMlmsFromFiles(files);
+		} catch (MainException e) {
+			e.print();
+			return false;
+		}
+		
+		boolean success = true;
+		JUnitCore junit = new JUnitCore();
+		junit.addListener(new TextListener(System.out));
+		for (MedicalLogicModule mlm : mlms) {
+			try {
+				Result result = mlm.test(junit);
+				if(!result.wasSuccessful()) {
+					success = false;
+				}
+			} catch (RuntimeException e) {
+				e.printStackTrace();
+				success = false;
+			}
+		}
+		return success;
 	}
 
 	public boolean compileFiles(List<File> files) {
@@ -463,7 +495,7 @@ public class MainClass {
 		}
 		return result;
 	}
-
+	
 	public static String getFilenameBase(String filename) {
 		int sepindex = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'));
 		int fnindex = filename.lastIndexOf('.');
