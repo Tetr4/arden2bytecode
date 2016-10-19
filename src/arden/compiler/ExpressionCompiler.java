@@ -799,14 +799,14 @@ final class ExpressionCompiler extends VisitorBase {
 	// | {dot} expr_factor dot identifier;
 	@Override
 	public void caseAExpfExprFactor(AExpfExprFactor node) {
-		// expr_factor = {expf} expr_factor_atom
-		node.getExprFactorAtom().apply(this);
+		// expr_factor = {expf} expr_construct
+		node.getExprConstruct().apply(this);
 	}
 
 	@Override
 	public void caseAEfeExprFactor(AEfeExprFactor node) {
-		// expr_factor = {efe} expr_factor_atom l_brk expr r_brk
-		node.getExprFactorAtom().apply(this);
+		// expr_factor = {efe} expr_construct l_brk expr r_brk
+		node.getExprConstruct().apply(this);
 		node.getExpr().apply(this);
 		context.writer.invokeStatic(getMethod("elementAt", ArdenValue.class, ArdenValue.class));
 	}
@@ -817,6 +817,20 @@ final class ExpressionCompiler extends VisitorBase {
 		node.getExprFactor().apply(this);
 		context.writer.loadStringConstant(node.getIdentifier().getText().toUpperCase(Locale.ENGLISH));
 		context.writer.invokeStatic(Compiler.getRuntimeHelper("getObjectMember", ArdenValue.class, String.class));
+	}
+	
+	@Override
+	public void caseAExpfExprConstruct(AExpfExprConstruct node) {
+		// expr_construct = {expf} expr_factor_atom
+		node.getExprFactorAtom().apply(this);
+	}
+	
+	@Override
+	public void caseAPipeExprConstruct(APipeExprConstruct node) {
+		// expr_construct = {pipe} expr_factor_atom pipe time_value
+		node.getExprFactorAtom().apply(this);
+		node.getTimeValue().apply(this);
+		context.writer.invokeStatic(Compiler.getRuntimeHelper("changeTime", ArdenValue.class, ArdenValue.class));
 	}
 
 	// expr_factor_atom =

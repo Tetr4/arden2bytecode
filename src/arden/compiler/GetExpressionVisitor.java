@@ -121,6 +121,16 @@ final class GetExpressionVisitor extends AnalysisAdapter {
 
 	@Override
 	public void caseAExpfExprFactor(AExpfExprFactor node) {
+		node.getExprConstruct().apply(this);
+	}
+	
+	@Override
+	public void caseAExpfExprConstruct(AExpfExprConstruct node) {
+		node.getExprFactorAtom().apply(this);
+	}
+	
+	@Override
+	public void caseAPipeExprConstruct(APipeExprConstruct node) {
 		node.getExprFactorAtom().apply(this);
 	}
 }

@@ -164,6 +164,7 @@ Tokens
   assign     = ':=';
   // logical
   logor  = '||';
+  pipe = '|';
 
   // comparison
   eqsign = '=';
@@ -198,6 +199,7 @@ Tokens
   all         = a l l;
   and         = a n d;
   any         = a n y;
+  anything    = a n y t h i n g;
   arccos      = a r c c o s;
   arcsin      = a r c s i n;
   arctan      = a r c t a n;
@@ -216,6 +218,7 @@ Tokens
   before      = b e f o r e;
   boolean     = b o o l e a n;
   call        = c a l l;
+  called      = c a l l e d;
   ceiling     = c e i l i n g;
   characters  = c h a r a c t e r s;
   citation    = c i t a t i o n;
@@ -337,6 +340,7 @@ Tokens
   new         = n e w;
   no          = n o;
   not         = n o t;
+  nothing     = n o t h i n g;
   now         = n o w;
   null        = n u l l ;
   number      = n u m b e r;
@@ -360,15 +364,18 @@ Tokens
   refute      = r e f u t e;
   research    = r e s e a r c h;
   return      = r e t u r n;
+  returned    = r e t u r n e d;  
   reverse     = r e v e r s e;
   right       = r i g h t;
   round       = r o u n d;
   same        = s a m e;
-  {normal->scenario} scenario    = s c e n a r i o ':';
+  scenario    = s c e n a r i o;
+  {normal->scenario} scenario_colon = s c e n a r i o ':';
   second      = s e c o n d;
   seconds     = s e c o n d s;
   select      = s e l e c t;
   seqto       = s e q t o;
+  should      = s h o u l d;
   sin         = s i n;
   sine        = s i n e;
   slope       = s l o p e;
@@ -394,6 +401,7 @@ Tokens
   title       = t i t l e;
   {normal -> text} title_colon = t i t l e ':';
   to          = t o;
+  triggered   = t r i g g e r e d;  
   triggertime = t r i g g e r t i m e;
   trim        = t r i m;
   true        = t r u e;
@@ -421,6 +429,7 @@ Tokens
   with        = w i t h;
   within      = w i t h i n;
   write       = w r i t e;
+  written     = w r i t t e n;  
   year        = y e a r;
   years       = y e a r s;
 
@@ -651,59 +660,101 @@ urgency_val =
 /****** validation slots ******/
 
 scenario_slot =
-      scenario scenario_text semicolon given_block semicolons;
+      scenario_colon scenario_text semicolon scenario_block semicolons;
 
 
 /****** validation block ******/
 
 /*
- * Order:
- *  1. single GIVEN statement + multiple AND statements
- *  2. single WHEN statement + multiple AND statements
- *  3. single THEN statement + multiple AND statements
- * Steps may be skipped, but step order must be maintained.
- * 
+ * Single GIVEN statement + multiple AND statements
+ * Single WHEN statement + multiple AND statements
+ * Single THEN statement + multiple AND statements
+ *
+ * Order can be mixed or repeated.
+ *
  * Empty statements (" ;") are not allowed.
+ *
+ * Semicolon for the last statement is optional.
  */
-
-given_block =
-      {gblk} given given_statement semicolon given_block_and
+ 
+scenario_block =
+      {empty} 
+    | {gblk} given given_statement semicolon given_block_and
+    | {wblk} when when_statement semicolon when_block_and
+    | {tblk} then then_statement semicolon then_block_and
     | {gstmt} given given_statement
-    | when_block;
-
-given_block_and =
-      {gblk} and given_statement semicolon given_block_and
-    | {gstmt} and given_statement
-    | when_block;
-
-when_block =
-      {wblk} when when_statement semicolon when_block_and
     | {wstmt} when when_statement
-    | then_block;
-
+    | {tstmt} then then_statement;
+     
+given_block_and =
+      {sblk} scenario_block
+    | {gblk} and given_statement semicolon given_block_and
+    | {gstmt} and given_statement;
+    
 when_block_and =
-      {wblk} and when_statement semicolon when_block_and
-    | {wstmt} and when_statement
-    | then_block;
-
-then_block =
-      {tblk} then then_statement semicolon then_block_and
-    | {tstmt} then then_statement
-    | {empty};
+      {sblk} scenario_block
+    | {wblk} and when_statement semicolon when_block_and
+    | {wstmt} and when_statement;
 
 then_block_and =
-      {tblk} and then_statement semicolon then_block_and
-    | {tstmt} and then_statement
-    | {empty};
+      {sblk} scenario_block    
+    | {tblk} and then_statement semicolon then_block_and
+    | {tstmt} and then_statement;
 
-given_statement = // TODO
-      ;
+given_statement =
+      {ass} read? mapping_factor P.is expr
+    | {iass} interface mapping_factor P.is expr;
 
-when_statement = // TODO
-      ;
+when_statement =
+      {call} mlm_definition P.is called
+    | {callargs} mlm_definition P.is called with expr
+    | {callevt} event? mapping_factor P.is called
+    | {callevttime} event? mapping_factor P.is called with time const_time
+    | {callevttimetime} event? mapping_factor P.is called with time const_time eventtime [eventttime]:const_time
+    | {time} currenttime P.is const_time
+    | {timealias} now P.is const_time;
 
-then_statement = // TODO
-      ;
+const_time =
+      {date}   iso_date
+    | {dtime}  iso_date_time;
+    
+mlm_definition =
+      {mlm} T.mlm? term
+    | {mlmi} T.mlm? term from institution string_literal
+    | {mlms} T.mlm? T.mlm_self;
+    
+then_statement =
+      {trigger} mlm_definition should not? be triggered
+    | {conclude} conclude should not? be expr
+    | {return} expr_indeterminate should not? be returned
+    | {returnnothing} nothing should not? be returned
+    | {write} expr_indeterminate should not? be written
+    | {writeat} expr_indeterminate should not? be written at destination? mapping_factor
+    | {writemsg} message? mapping_factor should not? be written
+    | {writemsgat} message? [msgmapping]:mapping_factor should not? be written at destination? [destmapping]:mapping_factor
+    | {writenothing} nothing should not? be written
+    | {writenothingat} nothing should not? be written at destination? mapping_factor
+    | {call} mlm_definition should not? be called
+    | {callargs} mlm_definition should not? be called with expr
+    | {calldelay} mlm_definition should not? be called delay [delayexp]:expr
+    | {calldelayargs} mlm_definition should not? be called with expr delay [delayexp]:expr
+    | {callevt} event? mapping_factor should not? be called
+    | {callevtdelay} event? mapping_factor should not? be called delay [delayexp]:expr
+    | {callnothing} nothing should not? be called;
+
+
+/****** validation expressions ******/
+
+expr_indeterminate =
+      {value}    expr_filter
+    | {commavalue}  expr_indeterminate comma expr_filter
+    | {comma}   comma expr_filter;
+    
+expr_filter =
+      {sort} expr_sort
+    | {plain} anything
+    | {where} anything where expr_sort;
+
 
 /****** logic block ******/
 
@@ -869,9 +920,14 @@ expr_function =
     | {attr}    attribute expr_factor from expr_function;
 
 expr_factor =
-      {expf}   expr_factor_atom
-    | {efe}    expr_factor_atom l_brk expr r_brk
+      {expf}   expr_construct
+    | {efe}    expr_construct l_brk expr r_brk
     | {dot}    expr_factor dot identifier;
+    
+expr_construct = 
+      {expf}    expr_factor_atom
+//  | {appl} expr_factor_atom pipe time_value pipe [applicability]:boolean_value
+    | {pipe}    expr_factor_atom pipe time_value;
 
 expr_factor_atom =
       {id}      identifier
