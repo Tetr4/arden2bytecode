@@ -2,10 +2,12 @@ package arden.runtime.validation;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+
+import org.junit.Assert;
 
 import arden.runtime.ArdenDuration;
 import arden.runtime.ArdenEvent;
@@ -20,19 +22,27 @@ import arden.runtime.MedicalLogicModule;
 import arden.runtime.MemoryQuery;
 
 public class ScenarioExecutionContext extends BaseExecutionContext {
+	// configuration
+	Map<String, ArdenValue[]> queries = new HashMap<>();
+	Map<String, ArdenValue[]> interfaces = new HashMap<>();
+
+	// captured output
+	List<WrittenMessage> writtenMessages = new ArrayList<>();
+	List<MlmCall> mlmCalls = new ArrayList<>();
+	List<EventCall> eventCalls = new ArrayList<>();
+
+	// event
+	ArdenTime currentTime = null;
+	ArdenTime triggerTime = null;
+	ArdenEvent evokingEvent;
 
 	public ScenarioExecutionContext() {
 		super(((URLClassLoader) (Thread.currentThread().getContextClassLoader())).getURLs());
 	}
 
-	ArdenTime currentTimeOverride = null;
-	Map<String, ArdenValue[]> queries = new HashMap<>();
-	Map<String, ArdenValue[]> interfaces = new HashMap<>();
-
-	Set<WrittenMessage> messages = new HashSet<>();
-	Set<MlmCall> mlmCalls = new HashSet<>();
-	Map<String, ArdenDuration> eventCalls = new HashMap<>();
-	ArdenEvent evokingEvent;
+	public void setCurrentTime(ArdenTime time) {
+		currentTime = time;
+	}
 
 	public void setQuery(String mapping, ArdenValue[] values) {
 		queries.put(mapping, values);
@@ -42,39 +52,82 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 		interfaces.put(mapping, values);
 	}
 
-	public void setEvokingEvent(ArdenEvent event) {
+	public void setEvokingEvent(ArdenEvent event, long delay) {
 		event.isEvokingEvent = true;
+		triggerTime = new ArdenTime(event.eventTime + delay);
 		this.evokingEvent = event;
 	}
 
-	public void assertCalled(boolean not, MedicalLogicModule mlm, ArdenValue[] args, ArdenValue delay) {
-		System.out.println("assertCalled MLM");
+	public void resetCapturedOutput() {
+		writtenMessages.clear();
+		mlmCalls.clear();
+		eventCalls.clear();
+		evokingEvent = null;
 	}
 
-	public void assertCalled(boolean not, String eventMapping, ArdenValue delay) {
-		System.out.println("assertCalled event");
+	public MlmCall[] getMlmCalls(MedicalLogicModule mlm) {
+		List<MlmCall> calls = new ArrayList<>();
+		for (MlmCall call : mlmCalls) {
+			if (call.mlm.getName().equalsIgnoreCase(mlm.getName())) {
+				calls.add(call);
+			}
+		}
+		return calls.toArray(new MlmCall[calls.size()]);
+	}
+	
+	public EventCall[] getEventCalls(String mapping) {
+		List<EventCall> calls = new ArrayList<>();
+		for (EventCall call : eventCalls) {
+			if (call.mapping.equalsIgnoreCase(mapping)) {
+				calls.add(call);
+			}
+		}
+		return calls.toArray(new EventCall[calls.size()]);
 	}
 
 	public void assertNothingCalled(boolean not) {
-		System.out.println("assertNothingCalled");
+		if (not) {
+			Assert.assertFalse("No MLM(s) where called", mlmCalls.isEmpty());
+			Assert.assertFalse("No Event(s) where called", eventCalls.isEmpty());
+		} else {
+			// TODO output mlms / events
+			Assert.assertTrue("MLM(s) have been called", mlmCalls.isEmpty());
+			Assert.assertTrue("Event(s) have been called", eventCalls.isEmpty());
+		}
+
 	}
 
-	public void assertNothingWritten(String destination) {
-		System.out.println("assertNothingWritten");
+	public void assertNothingWritten(boolean not, String destination) {
+		ArdenValue[] messages = getWrittenMessages(destination);
+		if (not) {
+			Assert.assertTrue("Nothing was written", messages.length != 0);
+		} else {
+			// TODO output messages
+			Assert.assertTrue("Message(s) have been written", messages.length == 0);
+		}
 	}
+	
+	// TODO method to remove checked messages?
 
 	public ArdenValue[] getWrittenMessages(String destination) {
-		System.out.println("getWrittenMessages");
-		return new ArdenValue[] { new ArdenString("hello world")};
+		List<ArdenValue> values = new ArrayList<>();
+		for (WrittenMessage message : writtenMessages) {
+			if (destination == null && message.destination == null) {
+				values.add(message.value);
+			} else if (destination != null && destination.equals(message.destination)) {
+				values.add(message.value);
+			}
+		}
+		return values.toArray(new ArdenValue[values.size()]);
 	}
-
+	
 	@Override
 	public DatabaseQuery createQuery(String mapping) {
 		ArdenValue[] values = queries.get(mapping);
-		if (values != null) {
-			return new MemoryQuery(values);
+		if (values == null) {
+			throw new AssertionError("The result for the {" + mapping + "} query is not defined.");
 		}
-		return super.createQuery(mapping);
+		return new MemoryQuery(values);
 	}
 
 	@Override
@@ -84,21 +137,28 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 
 	@Override
 	public ArdenEvent getEvent(String mapping) {
-		// TODO
+		if (evokingEvent != null && evokingEvent.name.equalsIgnoreCase(mapping)) {
+			return evokingEvent;
+		}
 		return super.getEvent(mapping);
 	}
 
 	@Override
 	public void write(ArdenValue message, String destination) {
-		messages.add(new WrittenMessage(ArdenString.getStringFromValue(message), destination));
+		writtenMessages.add(new WrittenMessage(message, destination));
 	}
 
 	@Override
 	public ArdenRunnable findInterface(final String mapping) {
+		final ArdenValue[] values = interfaces.get(mapping);
+		if (values == null) {
+			throw new AssertionError("The result for the {" + mapping + "} interface is not defined.");
+		}
+		
 		return new ArdenRunnable() {
 			@Override
 			public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments) throws InvocationTargetException {
-				return interfaces.get(mapping);
+				return values;
 			}
 		};
 	}
@@ -111,7 +171,7 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 	@Override
 	public void callEvent(ArdenEvent event) {
 		// TODO events can be called with delay
-		eventCalls.put(event.name, (ArdenDuration) ArdenDuration.seconds(0, 0));
+		eventCalls.add(new EventCall(event.name, null));
 	}
 
 	@Override
@@ -121,38 +181,12 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 
 	@Override
 	public ArdenTime getTriggerTime() {
-		// TODO
-		return super.getTriggerTime();
+		return triggerTime;
 	}
 
 	@Override
 	public ArdenTime getCurrentTime() {
-		if (currentTimeOverride != null) {
-			return currentTimeOverride;
-		}
-		return super.getCurrentTime();
-	}
-
-	private class MlmCall {
-		public MlmCall(MedicalLogicModule mlm, ArdenValue[] args, ArdenDuration delay) {
-			this.mlm = mlm;
-			this.args = args;
-			this.delay = delay;
-		}
-
-		MedicalLogicModule mlm;
-		ArdenValue[] args;
-		ArdenDuration delay;
-	}
-
-	private class WrittenMessage {
-		public WrittenMessage(String message, String destination) {
-			this.message = message;
-			this.destination = destination;
-		}
-
-		String message;
-		String destination;
+		return currentTime;
 	}
 
 }
