@@ -53,7 +53,7 @@ import arden.runtime.UnaryOperator;
  * 
  * @author Daniel Grunwald
  */
-final class ExpressionCompiler extends VisitorBase {
+class ExpressionCompiler extends VisitorBase {
 	private final CompilerContext context;
 
 	public CompilerContext getContext() {
