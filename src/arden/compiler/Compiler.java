@@ -75,6 +75,8 @@ import arden.runtime.MaintenanceMetadata;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.RuntimeHelpers;
 import arden.runtime.evoke.Trigger;
+import arden.runtime.validation.ScenarioEngine;
+import arden.runtime.validation.ScenarioExecutionContext;
 
 /**
  * The main class of the compiler.
@@ -169,7 +171,13 @@ public final class Compiler {
 		PValidationCategory validationCategory = mlm.getValidationCategory();
 		if (validationCategory != null) {
 			PValidationBody validation = ((AValidationCategory) validationCategory).getValidationBody();
-			compileValidation(codeGen, validation);
+			try {
+				compileValidation(codeGen, validation, metadata.maintenance.getMlmName());
+			} catch (NoSuchMethodException e) {
+				throw new RuntimeException(e);
+			} catch (SecurityException e) {
+				throw new RuntimeException(e);
+			}
 		}
 
 		// compile metadata
@@ -346,17 +354,37 @@ public final class Compiler {
 		return urgency;
 	}
 
-	private void compileValidation(CodeGenerator codeGen, PValidationBody validation) {
+	private void compileValidation(CodeGenerator codeGen, PValidationBody validation, String mlmSelf)
+			throws NoSuchMethodException, SecurityException {
 		LinkedList<PScenarioSlot> scenarios = ((AValidationBody) validation).getScenarioSlot();
 		for (PScenarioSlot scenario : scenarios) {
+			// create scenario method with annotations
 			String description = ((AScenarioSlot) scenario).getScenarioText().getText();
-
 			CompilerContext context = codeGen.createScenario(description);
-			scenario.apply(new ScenarioCompiler(context));
+			
+			// create execution context as local variable
+			final int contextVar = context.allocateVariable();
+			context.writer.newObject(ScenarioExecutionContext.class);
+			context.writer.dup();
+			context.writer.invokeConstructor(ScenarioExecutionContext.class.getConstructor());
+			context.writer.storeVariable(contextVar);
+
+			// create engine as local variable
+			final int engineVar = context.allocateVariable();
+			context.writer.newObject(ScenarioEngine.class);
+			context.writer.dup();
+			context.writer.loadVariable(contextVar);
+			context.writer.invokeConstructor(ScenarioEngine.class.getConstructor(ScenarioExecutionContext.class));
+			context.writer.storeVariable(engineVar);
+			
+			// compile statements
+			scenario.apply(new ScenarioCompiler(context, mlmSelf, contextVar, engineVar));
+			
+			// void return
 			context.writer.returnFromProcedure();
 		}
 	}
-
+	
 	static Method getRuntimeHelper(String name, Class<?>... parameterTypes) {
 		try {
 			return RuntimeHelpers.class.getMethod(name, parameterTypes);

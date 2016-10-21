@@ -679,33 +679,33 @@ scenario_slot =
  
 scenario_block =
       {empty} 
-    | {gblk} given given_statement semicolon given_block_and
-    | {wblk} when when_statement semicolon when_block_and
-    | {tblk} then then_statement semicolon then_block_and
-    | {gstmt} given given_statement
-    | {wstmt} when when_statement
-    | {tstmt} then then_statement;
+    | {gblk} given given_phrase semicolon given_block_and
+    | {wblk} when when_phrase semicolon when_block_and
+    | {tblk} then then_phrase semicolon then_block_and
+    | {gstmt} given given_phrase
+    | {wstmt} when when_phrase
+    | {tstmt} then then_phrase;
      
 given_block_and =
       {sblk} scenario_block
-    | {gblk} and given_statement semicolon given_block_and
-    | {gstmt} and given_statement;
+    | {gblk} and given_phrase semicolon given_block_and
+    | {gstmt} and given_phrase;
     
 when_block_and =
       {sblk} scenario_block
-    | {wblk} and when_statement semicolon when_block_and
-    | {wstmt} and when_statement;
+    | {wblk} and when_phrase semicolon when_block_and
+    | {wstmt} and when_phrase;
 
 then_block_and =
       {sblk} scenario_block    
-    | {tblk} and then_statement semicolon then_block_and
-    | {tstmt} and then_statement;
+    | {tblk} and then_phrase semicolon then_block_and
+    | {tstmt} and then_phrase;
 
-given_statement =
+given_phrase =
       {ass} read? mapping_factor P.is expr
     | {iass} interface mapping_factor P.is expr;
 
-when_statement =
+when_phrase =
       {call} mlm_definition P.is called
     | {callargs} mlm_definition P.is called with expr
     | {callevt} event? mapping_factor P.is called
@@ -716,6 +716,7 @@ when_statement =
 
 const_time =
       {date}   iso_date
+//  | {tod} time_of_day
     | {dtime}  iso_date_time;
     
 mlm_definition =
@@ -723,11 +724,12 @@ mlm_definition =
     | {mlmi} T.mlm? term from institution string_literal
     | {mlms} T.mlm? T.mlm_self;
     
-then_statement =
+then_phrase =
       {trigger} mlm_definition should not? be triggered
     | {conclude} conclude should not? be expr
-    | {return} expr_indeterminate should not? be returned
     | {returnnothing} nothing should not? be returned
+    | {return} expr_indeterminate should not? be returned
+    | {returnmixed} expr_mixed should not? be returned
     | {write} expr_indeterminate should not? be written
     | {writeat} expr_indeterminate should not? be written at destination? mapping_factor
     | {writemsg} message? mapping_factor should not? be written
@@ -745,15 +747,19 @@ then_statement =
 
 /****** validation expressions ******/
 
-expr_indeterminate =
-      {value}    expr_filter
-    | {commavalue}  expr_indeterminate comma expr_filter
-    | {comma}   comma expr_filter;
+/* comma separated list of constant expressions and indeterminate expressions */
+expr_mixed =
+      expr_indeterminate comma expr_mixed_tail;
+
+expr_mixed_tail = 
+      {value} expr_indeterminate
+    | {commavalue} expr_mixed_tail comma expr_indeterminate
+    | {comma} comma expr_indeterminate;
     
-expr_filter =
-      {sort} expr_sort
-    | {plain} anything
-    | {where} anything where expr_sort;
+expr_indeterminate =
+      {concrete} expr_sort
+    | {any} anything
+    | {filter} anything where expr_sort;
 
 
 /****** logic block ******/
