@@ -37,12 +37,12 @@ import arden.compiler.node.AMlmMlmDefinition;
 import arden.compiler.node.AMlmiMlmDefinition;
 import arden.compiler.node.AMlmsMlmDefinition;
 import arden.compiler.node.AReturnThenPhrase;
-import arden.compiler.node.AReturnmixedThenPhrase;
 import arden.compiler.node.AReturnnothingThenPhrase;
 import arden.compiler.node.ASblkGivenBlockAnd;
 import arden.compiler.node.ASblkThenBlockAnd;
 import arden.compiler.node.ASblkWhenBlockAnd;
 import arden.compiler.node.AScenarioSlot;
+import arden.compiler.node.ATailExprMixed;
 import arden.compiler.node.ATblkScenarioBlock;
 import arden.compiler.node.ATblkThenBlockAnd;
 import arden.compiler.node.ATimeWhenPhrase;
@@ -65,23 +65,22 @@ import arden.compiler.node.PExprIndeterminate;
 import arden.compiler.node.PExprMixed;
 import arden.runtime.ArdenTime;
 import arden.runtime.MedicalLogicModule;
+import arden.runtime.validation.Call;
 
 public final class ScenarioCompiler extends VisitorBase {
 
 	private final CompilerContext context;
-	private String mlmSelf;
+	private int mlmUnderTestVar;
 	private int contextVar;
 	private int engineVar;
-	private int returnedValuesIndexVar;
-	private int returnedValuesVar;
-	private int writtenMessagesVar;
-	private int writtenMessagesIndexVar;
+	private int loopIndexVar;
+	private int loopItemsVar;
 
-	public ScenarioCompiler(CompilerContext context, String mlmSelf, int contextVar, int engineVar) {
+	public ScenarioCompiler(CompilerContext context, int mlmUnderTestVar, int contextVar, int engineVar) {
 		this.context = context;
 		this.contextVar = contextVar;
 		this.engineVar = engineVar;
-		this.mlmSelf = mlmSelf;
+		this.mlmUnderTestVar = mlmUnderTestVar;
 	}
 
 	// scenario slot
@@ -219,18 +218,16 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseACallWhenPhrase(ACallWhenPhrase node) {
-		// when_phrase = {call} mlm_definition P.is called
+		// when_phrase = {call} T.mlm P.is called
 		context.writer.loadVariable(engineVar);
-		node.getMlmDefinition().apply(this);
 		context.writer.loadNull();
 		context.writer.invokeInstance(ScenarioMethods.callMlm);
 	}
 
 	@Override
 	public void caseACallargsWhenPhrase(ACallargsWhenPhrase node) {
-		// when_phrase = {callargs} mlm_definition P.is called with expr
+		// when_phrase = {callargs} T.mlm P.is called with expr
 		context.writer.loadVariable(engineVar);
-		node.getMlmDefinition().apply(this);
 		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
 		context.writer.invokeInstance(ScenarioMethods.callMlm);
 	}
@@ -307,7 +304,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	@Override
 	public void caseAMlmsMlmDefinition(AMlmsMlmDefinition node) {
 		// mlm_definition = {mlms} T.mlm? T.mlm_self
-		loadMlmSelf();
+		context.writer.loadVariable(mlmUnderTestVar);
 	}
 
 	/** Leaves an {@link ArdenTime} on the Stack. */
@@ -326,21 +323,13 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadStaticField(context.codeGenerator.getTimeLiteral(date));
 	}
 	
-	private void loadMlmSelf() {
-		context.writer.loadVariable(contextVar);
-		context.writer.loadStringConstant(mlmSelf);
-		context.writer.loadNull();
-		context.writer.invokeInstance(ExecutionContextMethods.findModule);
-	}
-
 	// then statements
 
 	@Override
 	public void caseATriggerThenPhrase(ATriggerThenPhrase node) {
-		// then_phrase = {trigger} mlm_definition should not? be triggered
+		// then_phrase = {trigger} T.mlm should not? be triggered
 		context.writer.loadVariable(engineVar);
 		loadBoolean(node.getNot() != null);
-		node.getMlmDefinition().apply(this);
 		context.writer.invokeInstance(ScenarioMethods.assertIsTriggered);
 	}
 
@@ -349,85 +338,43 @@ public final class ScenarioCompiler extends VisitorBase {
 		// then_phrase = {conclude} conclude should not? be expr
 		context.writer.loadVariable(engineVar);
 		loadBoolean(node.getNot() != null);
-		loadMlmSelf();
 		node.getExpr().apply(new ExpressionCompiler(context));
 		context.writer.invokeInstance(ScenarioMethods.assertConclude);
 	}
 
 	@Override
 	public void caseAReturnThenPhrase(AReturnThenPhrase node) {
-		// then_phrase = {return} expr_indeterminate should not? be returned
-		checkReturned(Collections.singletonList(node.getExprIndeterminate()), node.getNot() != null);
-	}
-	
-	@Override
-	public void caseAReturnmixedThenPhrase(AReturnmixedThenPhrase node) {
-		// then_phrase = {returnmixed} expr_mixed should not? be returned
+		// then_phrase = {return} expr_mixed should not? be returned
 		List<PExprIndeterminate> expressions = toCommaSeparatedList(node.getExprMixed());
 		checkReturned(expressions, node.getNot() != null);
 	}
 	
 	private void checkReturned(List<PExprIndeterminate> expressions, boolean not) {
 		// get return values array
-		returnedValuesVar = context.allocateVariable();
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(engineVar);
-		loadMlmSelf();
 		context.writer.invokeInstance(ScenarioMethods.getReturnedValues);
-		context.writer.storeVariable(returnedValuesVar);
+		context.writer.storeVariable(loopItemsVar);
 
 		// index = 0
-		returnedValuesIndexVar = context.allocateVariable();
+		loopIndexVar = context.allocateVariable();
 		context.writer.loadIntegerConstant(0);
-		context.writer.storeIntVariable(returnedValuesIndexVar);
+		context.writer.storeIntVariable(loopIndexVar);
 
 		if (not) {
 			// check return value count. if different then success, else check expressions
 			context.writer.loadIntegerConstant(expressions.size());
-			context.writer.loadVariable(returnedValuesVar);
+			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.isSameNumberOfValues);
 			final Label success = new Label();
 			context.writer.jumpIfZero(success);
 
-			ExpressionCompiler notReturnExpressionCheck = new ExpressionCompiler(context) {
-				
-				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
-					node.getExprSort().apply(this); // expected
-					loadCurrentReturnedValue(); // actual
-					context.writer.invokeInstance(ScenarioMethods.equals);
-					context.writer.jumpIfZero(success); // different -> success
-				}
-				
-				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
-				}
-				
-				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
-					loadCurrentReturnedValue();
-
-					// store in "IT" variable
-					int it = context.allocateItVariable();
-					context.writer.storeVariable(it);
-					node.getExprSort().apply(this);
-					context.popItVariable();
-
-					context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
-					// success if filter does not match
-					context.writer.jumpIfZero(success); 
-				}
-
-			};
-
 			for (PExprIndeterminate expr : expressions) {
-				expr.apply(notReturnExpressionCheck);
-				context.writer.incVariable(returnedValuesIndexVar, 1);
+				checkNotReturnExpression(success, expr);
+				context.writer.incVariable(loopIndexVar, 1);
 			}
 
-			// not jump to success label -> fail
+			// fail
 			context.writer.loadStringConstant("The value(s) that should not be returned where returned.");
 			context.writer.invokeStatic(ScenarioMethods.fail);
 
@@ -436,55 +383,90 @@ public final class ScenarioCompiler extends VisitorBase {
 		} else {
 			// check return value count
 			context.writer.loadIntegerConstant(expressions.size()); // expected
-																	// count
-			context.writer.loadVariable(returnedValuesVar); // actual count
-			context.writer.invokeStatic(ScenarioMethods.assertSameNumberOfValues);
-
-			ExpressionCompiler returnExpressionCheck = new ExpressionCompiler(context) {
-
-				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
-					context.writer.loadStringConstant("Wrong return value");
-					node.getExprSort().apply(this); // expected
-					loadCurrentReturnedValue(); // actual
-					context.writer.invokeStatic(ScenarioMethods.assertEquals);
-				}
-				
-				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
-				}
-
-
-				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
-					loadCurrentReturnedValue();
-
-					// store in "IT" variable
-					context.writer.dup();
-					int it = context.allocateItVariable();
-					context.writer.storeVariable(it);
-					node.getExprSort().apply(this); // expected
-					context.popItVariable();
-
-					context.writer.swap();
-					context.writer.loadIntVariable(returnedValuesIndexVar);
-					context.writer.invokeStatic(ScenarioMethods.assertValidFilterResult);
-				}
-			};
+			context.writer.loadVariable(loopItemsVar); // actual
+			context.writer.invokeStatic(ScenarioMethods.assertSameNumberOfReturnValues);
 
 			for (PExprIndeterminate expr : expressions) {
-				expr.apply(returnExpressionCheck);
-				context.writer.incVariable(returnedValuesIndexVar, 1);
+				checkReturnExpression(expr);
+				context.writer.incVariable(loopIndexVar, 1);
 			}
 		}
 	}
+	
+	private void checkNotReturnExpression(final Label success, PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
 
-	private void loadCurrentReturnedValue() {
-		context.writer.loadVariable(returnedValuesVar);
-		context.writer.loadIntVariable(returnedValuesIndexVar);
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				node.getExprSort().apply(this); // expected
+				loadCurrentLoopItem(); // actual
+				context.writer.invokeInstance(ScenarioMethods.equals);
+				context.writer.jumpIfZero(success); // different -> success
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				loadCurrentLoopItem();
+
+				// store in "IT" variable
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this);
+				context.popItVariable();
+
+				context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+				// success if filter does not match
+				context.writer.jumpIfZero(success);
+			}
+		});
+	}
+
+	private void checkReturnExpression(PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
+
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				context.writer.loadStringConstant("Wrong return value");
+				node.getExprSort().apply(this); // expected
+				loadCurrentLoopItem(); // actual
+				context.writer.invokeStatic(ScenarioMethods.assertEquals);
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				loadCurrentLoopItem();
+
+				// store in "IT" variable
+				context.writer.dup();
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this); // expected
+				context.popItVariable();
+
+				context.writer.swap();
+				context.writer.loadIntVariable(loopIndexVar);
+				context.writer.invokeStatic(ScenarioMethods.assertValidFilterResult);
+			}
+		});
+	}
+
+	private void loadCurrentLoopItem() {
+		context.writer.loadVariable(loopItemsVar);
+		context.writer.loadIntVariable(loopIndexVar);
 		context.writer.loadObjectFromArray();
 	}	
 	
@@ -493,7 +475,6 @@ public final class ScenarioCompiler extends VisitorBase {
 		// then_phrase = {returnnothing} nothing should not? be returned
 		context.writer.loadVariable(engineVar);
 		loadBoolean(node.getNot() != null);
-		loadMlmSelf();
 		context.writer.invokeInstance(ScenarioMethods.assertNothingReturned);
 	}
 	
@@ -506,146 +487,79 @@ public final class ScenarioCompiler extends VisitorBase {
 	@Override
 	public void caseAWriteatThenPhrase(AWriteatThenPhrase node) {
 		// then_phrase = {writeat} expr_indeterminate should not? be written at destination? mapping_factor
-		String destination = ParseHelpers.getStringForMapping(node.getMappingFactor());
-		checkWritten(destination, node.getExprIndeterminate(), node.getNot() != null);
+		String destinationMapping = ParseHelpers.getStringForMapping(node.getMappingFactor());
+		checkWritten(destinationMapping, node.getExprIndeterminate(), node.getNot() != null);
 	}
 	
 	private void checkWritten(String destination, PExprIndeterminate expr, boolean not) {
 		// get messages array
-		writtenMessagesVar = context.allocateVariable();
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
+		String destName;
 		if (destination != null) {
+			destName = "{" + destination + "}";
 			context.writer.loadStringConstant(destination);
 		} else {
+			destName = "<default destination>";
 			context.writer.loadNull();
 		}
 		context.writer.invokeInstance(ScenarioMethods.getWrittenMessages);
-		context.writer.storeVariable(writtenMessagesVar);
+		context.writer.storeVariable(loopItemsVar);
 		
 		// index = 0
-		writtenMessagesIndexVar = context.allocateVariable();
+		loopIndexVar = context.allocateVariable();
 		context.writer.loadIntegerConstant(0);
-		context.writer.storeIntVariable(writtenMessagesIndexVar);
+		context.writer.storeIntVariable(loopIndexVar);
 		
 		final Label loop = new Label();
 		final Label success = new Label();
 		final Label fail = new Label();
 		
 		if (not) {
-			// TODO
-			ExpressionCompiler notMessageCheck = new ExpressionCompiler(context) {
-				
-				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
-					node.getExprSort().apply(this); // expected
-					loadCurrentWrittenMessage(); // actual
-					context.writer.invokeInstance(ScenarioMethods.equals);
-					context.writer.jumpIfNonZero(fail); // same -> fail
-				}
-				
-				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
-					context.writer.jump(fail);
-				}
-
-				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
-					loadCurrentWrittenMessage();
-					
-					// store in "IT" variable
-					int it = context.allocateItVariable();
-					context.writer.storeVariable(it);
-					node.getExprSort().apply(this);
-					context.popItVariable();
-					
-					context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
-					context.writer.jumpIfNonZero(fail); // filter matches -> fail
-				}
-				
-			};
-			
 			// check if no messages were written
-			context.writer.loadIntVariable(writtenMessagesIndexVar);
-			context.writer.loadVariable(writtenMessagesVar);
-			context.writer.invokeStatic(ScenarioMethods.moreMessagesAvailable);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(success);
 
 			// for each message run the following generated code
 			context.writer.mark(loop);
-			expr.apply(notMessageCheck);
-			context.writer.incVariable(writtenMessagesIndexVar, 1);
-			context.writer.loadIntVariable(writtenMessagesIndexVar);
-			context.writer.loadVariable(writtenMessagesVar);
-			context.writer.invokeStatic(ScenarioMethods.moreMessagesAvailable);
+			checkNotMessageWritten(fail, expr);
+			context.writer.incVariable(loopIndexVar, 1);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(success);
 			context.writer.jump(loop);
 			// endfor
 			
 			// fail
 			context.writer.markForwardJumpsOnly(fail);
-			context.writer.loadStringConstant("The message that should not be written was written.");
+			context.writer.loadStringConstant("The message that should not be written at " + destName + " was written.");
 			context.writer.invokeStatic(ScenarioMethods.fail);
 			
 			// success
 			context.writer.markForwardJumpsOnly(success);
 		} else {
-			ExpressionCompiler messageCheck = new ExpressionCompiler(context) {
-				
-				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
-					node.getExprSort().apply(this); // expected
-					loadCurrentWrittenMessage(); // actual
-					context.writer.invokeInstance(ScenarioMethods.equals);
-					context.writer.jumpIfNonZero(success); // same -> success
-				}
-				
-				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
-					context.writer.jump(success);
-				}
-
-				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
-					loadCurrentWrittenMessage();
-					
-					// store in "IT" variable
-					int it = context.allocateItVariable();
-					context.writer.storeVariable(it);
-					node.getExprSort().apply(this);
-					context.popItVariable();
-					
-					context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
-					context.writer.jumpIfNonZero(success); // filter matches -> success
-				}
-				
-			};
-			
 			// check if messages are available
-			context.writer.loadStringConstant("No messages written");
-			context.writer.loadIntVariable(writtenMessagesIndexVar);
-			context.writer.loadVariable(writtenMessagesVar);
-			context.writer.invokeStatic(ScenarioMethods.moreMessagesAvailable);
+			context.writer.loadStringConstant("No messages written at " + destName);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.invokeStatic(ScenarioMethods.assertTrue);
 
 			// for each message run the following generated code
 			context.writer.mark(loop);
-			expr.apply(messageCheck);
-			context.writer.incVariable(writtenMessagesIndexVar, 1);
-			context.writer.loadIntVariable(writtenMessagesIndexVar);
-			context.writer.loadVariable(writtenMessagesVar);
-			context.writer.invokeStatic(ScenarioMethods.moreMessagesAvailable);
+			checkMessageWritten(success, expr);
+			context.writer.incVariable(loopIndexVar, 1);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfNonZero(loop);
 			// endfor
 			
 			// fail
-			context.writer.markForwardJumpsOnly(fail);
-			context.writer.loadStringConstant("No matching message was written.");
+			context.writer.loadStringConstant("No matching message was written at " + destName);
 			context.writer.invokeStatic(ScenarioMethods.fail);
 			
 			// success
@@ -653,15 +567,83 @@ public final class ScenarioCompiler extends VisitorBase {
 		}
 	}
 	
-	private void loadCurrentWrittenMessage() {
-		context.writer.loadVariable(writtenMessagesVar);
-		context.writer.loadIntVariable(writtenMessagesIndexVar);
-		context.writer.loadObjectFromArray();
+	private void checkMessageWritten(final Label success, PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
+
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				node.getExprSort().apply(this); // expected
+				loadCurrentLoopItem(); // actual
+				context.writer.invokeInstance(ScenarioMethods.equals);
+				context.writer.jumpIfNonZero(success); // same -> success
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+				context.writer.jump(success);
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				loadCurrentLoopItem();
+
+				// store in "IT" variable
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this);
+				context.popItVariable();
+
+				context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+				// filter matches -> success
+				context.writer.jumpIfNonZero(success);
+			}
+		});
+	}
+
+	private void checkNotMessageWritten(final Label fail, PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
+
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				node.getExprSort().apply(this); // expected
+				loadCurrentLoopItem(); // actual
+				context.writer.invokeInstance(ScenarioMethods.equals);
+				context.writer.jumpIfNonZero(fail); // same -> fail
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+				context.writer.jump(fail);
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				loadCurrentLoopItem();
+
+				// store in "IT" variable
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this);
+				context.popItVariable();
+
+				context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+				// filter matches -> fail
+				context.writer.jumpIfNonZero(fail);
+			}
+		});
 	}
 
 	@Override
 	public void caseAWritemsgThenPhrase(AWritemsgThenPhrase node) {
 		// then_phrase = {writemsg} message? mapping_factor should not? be written
+		
+		loadBoolean(node.getNot() != null);
 		
 		// load message as ArdenString
 		String msgMapping = ParseHelpers.getStringForMapping(node.getMappingFactor());
@@ -674,17 +656,16 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadNull();
 		context.writer.invokeInstance(ScenarioMethods.getWrittenMessages);
 		
+		context.writer.loadStringConstant("<default destination>");
 		context.writer.invokeStatic(ScenarioMethods.assertMessageInList);
 	}
 
 	@Override
 	public void caseAWritemsgatThenPhrase(AWritemsgatThenPhrase node) {
 		// then_phrase = {writemsgat} message? [msgmapping]:mapping_factor should not? be written at destination? [destmapping]:mapping_factor
+		String destinationMapping = ParseHelpers.getStringForMapping(node.getDestmapping());
 		
-		// get messages array
-		context.writer.loadVariable(contextVar);
-		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getDestmapping()));
-		context.writer.invokeInstance(ScenarioMethods.getWrittenMessages);
+		loadBoolean(node.getNot() != null);
 		
 		// load message as ArdenString
 		String msgMapping = ParseHelpers.getStringForMapping(node.getMsgmapping());
@@ -692,6 +673,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadStringConstant(msgMapping);
 		context.writer.invokeInstance(ExecutionContextMethods.getMessage);
 		
+		// get messages array
+		context.writer.loadVariable(contextVar);
+		context.writer.loadStringConstant(destinationMapping);
+		context.writer.invokeInstance(ScenarioMethods.getWrittenMessages);
+		
+		context.writer.loadStringConstant(destinationMapping);
 		context.writer.invokeStatic(ScenarioMethods.assertMessageInList);
 	}
 
@@ -699,6 +686,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	public void caseAWritenothingThenPhrase(AWritenothingThenPhrase node) {
 		// then_phrase = {writenothing} nothing should not? be written
 		context.writer.loadVariable(contextVar);
+		loadBoolean(node.getNot() != null);
 		context.writer.loadNull();
 		context.writer.invokeInstance(ScenarioMethods.assertNothingWritten);
 	}
@@ -706,6 +694,8 @@ public final class ScenarioCompiler extends VisitorBase {
 	@Override
 	public void caseAWritenothingatThenPhrase(AWritenothingatThenPhrase node) {
 		// then_phrase = {writenothingat} nothing should not? be written at destination? mapping_factor
+		context.writer.loadVariable(contextVar);
+		loadBoolean(node.getNot() != null);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
 		context.writer.invokeInstance(ScenarioMethods.assertNothingWritten);
 	}
@@ -713,65 +703,236 @@ public final class ScenarioCompiler extends VisitorBase {
 	@Override
 	public void caseACallThenPhrase(ACallThenPhrase node) {
 		// then_phrase = {call} mlm_definition should not? be called
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		node.getMlmDefinition().apply(this);
-		context.writer.loadNull();
-		context.writer.loadNull();
-		context.writer.invokeInstance(ScenarioMethods.assertMlmCalled);	
+		context.writer.invokeInstance(ScenarioMethods.getMlmCalls); // Returns object of type "Call"
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, null, null);
 	}
 
 	@Override
 	public void caseACallargsThenPhrase(ACallargsThenPhrase node) {
-		// then_phrase = {callargs} mlm_definition should not? be called with expr
+		// then_phrase = {callargs} mlm_definition should not? be called with expr_mixed
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		node.getMlmDefinition().apply(this);
-		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
-		context.writer.loadNull();
-		context.writer.invokeInstance(ScenarioMethods.assertMlmCalled);
+		context.writer.invokeInstance(ScenarioMethods.getMlmCalls);
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, node.getExprMixed(), null);
 	}
 
 	@Override
 	public void caseACalldelayThenPhrase(ACalldelayThenPhrase node) {
-		// then_phrase = {calldelay} mlm_definition should not? be called delay [delayexp]:expr
+		// then_phrase = {calldelay} mlm_definition should not? be called delay expr_indeterminate
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		node.getMlmDefinition().apply(this);
-		context.writer.loadNull();
-		node.getDelayexp().apply(new ExpressionCompiler(context));
-		context.writer.invokeInstance(ScenarioMethods.assertMlmCalled);
+		context.writer.invokeInstance(ScenarioMethods.getMlmCalls);
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, null, node.getExprIndeterminate());
 	}
 
 	@Override
 	public void caseACalldelayargsThenPhrase(ACalldelayargsThenPhrase node) {
-		// then_phrase = {calldelayargs} mlm_definition should not? be called with expr delay [delayexp]:expr
+		// then_phrase = {calldelayargs} mlm_definition should not? be called with expr_mixed delay expr_indeterminate
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		node.getMlmDefinition().apply(this);
-		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
-		node.getDelayexp().apply(new ExpressionCompiler(context));
-		context.writer.invokeInstance(ScenarioMethods.assertMlmCalled);
+		context.writer.invokeInstance(ScenarioMethods.getMlmCalls); // Returns object of type "Call"
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, node.getExprMixed(), node.getExprIndeterminate());
+	}
+
+	/** Requires that an array of {@link Call}s must be loaded in the loopItemsVar variable! */
+	private void checkCall(boolean not, PExprMixed argsExpr, PExprIndeterminate delayExpr) {
+		// index = -1
+		loopIndexVar = context.allocateVariable();
+		context.writer.loadIntegerConstant(0);
+		context.writer.storeIntVariable(loopIndexVar);
+		
+		final Label next = new Label();
+		final Label success = new Label();
+		final Label fail = new Label();
+		
+		if (not) {
+			// TODO not called
+
+		} else {
+			context.writer.incVariable(loopIndexVar, -1);
+			
+			context.writer.mark(next);
+			context.writer.incVariable(loopIndexVar, 1);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
+			context.writer.jumpIfZero(fail); // no calls left to check -> fail
+			checkArgsMatch(next, argsExpr); // try next call if not matched
+			checkDelayMatches(next, delayExpr);  // try next call if not matched
+			context.writer.jump(success); // not jump back -> success
+			// endfor
+
+			// fail
+			context.writer.markForwardJumpsOnly(fail);
+			context.writer.loadStringConstant("No matching call was found");
+			context.writer.invokeStatic(ScenarioMethods.fail);
+
+			// success
+			context.writer.markForwardJumpsOnly(success);
+		}
+	}
+	
+	/** Generates code that jumps to fail label if args do not match  */
+	private void checkArgsMatch(final Label fail, PExprMixed argsExpr) {
+		// for each arg if not matches -> fail
+		List<PExprIndeterminate> args;
+		if (argsExpr == null) {
+			args = Collections.emptyList();
+		} else {
+			args = toCommaSeparatedList(argsExpr);
+		}
+		
+		// get args array from MlmCall
+		final int argsVar = context.allocateVariable();
+		loadCurrentLoopItem(); 
+		context.writer.loadInstanceField(ScenarioMethods.mlmCallArgs);
+		context.writer.storeVariable(argsVar);
+
+		// index = 0
+		final int argsIndexVar = context.allocateVariable();
+		context.writer.loadIntegerConstant(0);
+		context.writer.storeIntVariable(argsIndexVar);
+		
+		// check args count
+		context.writer.loadIntegerConstant(args.size()); // expected
+		context.writer.loadVariable(argsVar); // actual
+		context.writer.invokeStatic(ScenarioMethods.isSameNumberOfValues);
+		context.writer.jumpIfZero(fail); // not same number of args
+
+		for (PExprIndeterminate argExpr : args) {
+			
+			argExpr.apply(new ExpressionCompiler(context) {
+
+				@Override
+				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+					// expr_indeterminate = {concrete} expr_sort
+					// expected
+					node.getExprSort().apply(this); 
+					
+					// actual
+					context.writer.loadVariable(argsVar);
+					context.writer.loadIntVariable(argsIndexVar);
+					context.writer.loadObjectFromArray();
+					
+					context.writer.invokeInstance(ScenarioMethods.equals);
+					context.writer.jumpIfZero(fail); // args not equal
+				}
+
+				@Override
+				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+					// expr_indeterminate = {any} anything
+				}
+
+				@Override
+				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+					// expr_indeterminate = {filter} anything where expr_sort;
+					context.writer.loadVariable(argsVar);
+					context.writer.loadIntVariable(argsIndexVar);
+					context.writer.loadObjectFromArray();
+
+					// store in "IT" variable
+					int it = context.allocateItVariable();
+					context.writer.storeVariable(it);
+					node.getExprSort().apply(this); // expected
+					context.popItVariable();
+
+					context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+					context.writer.jumpIfZero(fail); // filter did not match
+				}
+			});
+			
+			context.writer.incVariable(argsIndexVar, 1);
+		}
+	}
+	
+	/** Generates code that jumps to fail label if delay does not match */
+	private void checkDelayMatches(final Label fail, PExprIndeterminate delayExpr) {
+		// if not matches -> fail
+		if (delayExpr == null) {
+			loadCurrentLoopItem();
+			context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+			context.writer.invokeStatic(ScenarioMethods.isZeroDelay);
+			context.writer.jumpIfZero(fail); // delay not equal
+		} else {
+			delayExpr.apply(new ExpressionCompiler(context) {
+
+				@Override
+				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+					// expr_indeterminate = {concrete} expr_sort
+
+					// expected delay
+					node.getExprSort().apply(this);
+
+					// actual delay
+					loadCurrentLoopItem();
+					context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+
+					context.writer.invokeInstance(ScenarioMethods.equals);
+					context.writer.jumpIfZero(fail); // delay not equal
+				}
+
+				@Override
+				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+					// expr_indeterminate = {any} anything
+				}
+
+				@Override
+				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+					// expr_indeterminate = {filter} anything where expr_sort;
+
+					// load delay
+					loadCurrentLoopItem();
+					context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+
+					// store in "IT" variable
+					int it = context.allocateItVariable();
+					context.writer.storeVariable(it);
+					node.getExprSort().apply(this); // expected delay
+					context.popItVariable();
+
+					context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+					context.writer.jumpIfZero(fail); // filter did not match
+				}
+			});
+		}
 	}
 
 	@Override
 	public void caseACallevtThenPhrase(ACallevtThenPhrase node) {
 		// then_phrase = {callevt} event? mapping_factor should not? be called
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		context.writer.loadNull();
-		context.writer.invokeInstance(ScenarioMethods.assertEventCalled);
+		context.writer.invokeInstance(ScenarioMethods.getEventCalls); // Returns object of type "Call"
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, null, null);
 	}
 
 	@Override
 	public void caseACallevtdelayThenPhrase(ACallevtdelayThenPhrase node) {
-		// then_phrase = {callevtdelay} event? mapping_factor should not? be called delay [delayexp]:expr
+		// then_phrase = {callevtdelay} event? mapping_factor should not? be called delay expr_indeterminate
+		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
-		loadBoolean(node.getNot() != null);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		node.getDelayexp().apply(new ExpressionCompiler(context));
-		context.writer.invokeInstance(ScenarioMethods.assertEventCalled);
+		context.writer.invokeInstance(ScenarioMethods.getEventCalls); // Returns object of type "Call"
+		context.writer.storeVariable(loopItemsVar);
+		
+		checkCall(node.getNot() != null, null, node.getExprIndeterminate());
 	}
 
 	@Override
@@ -791,6 +952,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		expr.apply(new VisitorBase() {
 			@Override
 			public void caseAExprMixed(AExprMixed node) {
+				// expr_mixed = expr_indeterminate
+				output.add(node.getExprIndeterminate());
+			}
+			
+			@Override
+			public void caseATailExprMixed(ATailExprMixed node) {
 				// expr_mixed = expr_indeterminate comma expr_mixed_tail
 				output.add(node.getExprIndeterminate());
 				node.getExprMixedTail().apply(this);

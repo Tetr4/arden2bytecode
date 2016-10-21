@@ -706,8 +706,8 @@ given_phrase =
     | {iass} interface mapping_factor P.is expr;
 
 when_phrase =
-      {call} mlm_definition P.is called
-    | {callargs} mlm_definition P.is called with expr
+      {call} T.mlm P.is called
+    | {callargs} T.mlm P.is called with expr
     | {callevt} event? mapping_factor P.is called
     | {callevttime} event? mapping_factor P.is called with time const_time
     | {callevttimetime} event? mapping_factor P.is called with time const_time eventtime [eventttime]:const_time
@@ -715,21 +715,15 @@ when_phrase =
     | {timealias} now P.is const_time;
 
 const_time =
-      {date}   iso_date
+      {date} iso_date
 //  | {tod} time_of_day
-    | {dtime}  iso_date_time;
-    
-mlm_definition =
-      {mlm} T.mlm? term
-    | {mlmi} T.mlm? term from institution string_literal
-    | {mlms} T.mlm? T.mlm_self;
+    | {dtime} iso_date_time;
     
 then_phrase =
-      {trigger} mlm_definition should not? be triggered
+      {trigger} T.mlm should not? be triggered
     | {conclude} conclude should not? be expr
     | {returnnothing} nothing should not? be returned
-    | {return} expr_indeterminate should not? be returned
-    | {returnmixed} expr_mixed should not? be returned
+    | {return} expr_mixed should not? be returned
     | {write} expr_indeterminate should not? be written
     | {writeat} expr_indeterminate should not? be written at destination? mapping_factor
     | {writemsg} message? mapping_factor should not? be written
@@ -737,19 +731,24 @@ then_phrase =
     | {writenothing} nothing should not? be written
     | {writenothingat} nothing should not? be written at destination? mapping_factor
     | {call} mlm_definition should not? be called
-    | {callargs} mlm_definition should not? be called with expr
-    | {calldelay} mlm_definition should not? be called delay [delayexp]:expr
-    | {calldelayargs} mlm_definition should not? be called with expr delay [delayexp]:expr
+    | {callargs} mlm_definition should not? be called with expr_mixed
+    | {calldelay} mlm_definition should not? be called delay expr_indeterminate
+    | {calldelayargs} mlm_definition should not? be called with expr_mixed delay expr_indeterminate
     | {callevt} event? mapping_factor should not? be called
-    | {callevtdelay} event? mapping_factor should not? be called delay [delayexp]:expr
+    | {callevtdelay} event? mapping_factor should not? be called delay expr_indeterminate
     | {callnothing} nothing should not? be called;
 
+mlm_definition =
+      {mlm} T.mlm? term
+    | {mlmi} T.mlm? term from institution string_literal
+    | {mlms} T.mlm? T.mlm_self;
 
 /****** validation expressions ******/
 
 /* comma separated list of constant expressions and indeterminate expressions */
 expr_mixed =
-      expr_indeterminate comma expr_mixed_tail;
+       expr_indeterminate
+    |  {tail} expr_indeterminate comma expr_mixed_tail;
 
 expr_mixed_tail = 
       {value} expr_indeterminate

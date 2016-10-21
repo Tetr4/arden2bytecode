@@ -368,17 +368,26 @@ public final class Compiler {
 			context.writer.dup();
 			context.writer.invokeConstructor(ScenarioExecutionContext.class.getConstructor());
 			context.writer.storeVariable(contextVar);
+			
+			// load mlm under test
+			final int mlmUnderTestVar = context.allocateVariable();
+			context.writer.loadVariable(contextVar);
+			context.writer.loadStringConstant(mlmSelf);
+			context.writer.loadNull();
+			context.writer.invokeInstance(ExecutionContextMethods.findModule);
+			context.writer.storeVariable(mlmUnderTestVar);
 
 			// create engine as local variable
 			final int engineVar = context.allocateVariable();
 			context.writer.newObject(ScenarioEngine.class);
 			context.writer.dup();
 			context.writer.loadVariable(contextVar);
-			context.writer.invokeConstructor(ScenarioEngine.class.getConstructor(ScenarioExecutionContext.class));
+			context.writer.loadVariable(mlmUnderTestVar);
+			context.writer.invokeConstructor(ScenarioEngine.class.getConstructor(ScenarioExecutionContext.class, MedicalLogicModule.class));
 			context.writer.storeVariable(engineVar);
 			
 			// compile statements
-			scenario.apply(new ScenarioCompiler(context, mlmSelf, contextVar, engineVar));
+			scenario.apply(new ScenarioCompiler(context, mlmUnderTestVar, contextVar, engineVar));
 			
 			// void return
 			context.writer.returnFromProcedure();
