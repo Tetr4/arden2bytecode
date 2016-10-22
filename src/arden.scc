@@ -720,7 +720,7 @@ const_time =
     
 then_phrase =
       {trigger} T.mlm should not? be triggered
-    | {conclude} conclude should not? be expr_indeterminate
+    | {conclude} expr_indeterminate should not? be conclude
     | {returnnothing} nothing should not? be returned
     | {return} expr_mixed should not? be returned
     | {write} expr_indeterminate should not? be written
