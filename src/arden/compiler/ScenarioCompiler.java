@@ -19,7 +19,6 @@ import arden.compiler.node.ACallevtdelayThenPhrase;
 import arden.compiler.node.ACallevttimeWhenPhrase;
 import arden.compiler.node.ACallevttimetimeWhenPhrase;
 import arden.compiler.node.ACallnothingThenPhrase;
-import arden.compiler.node.ACommaExprMixedTail;
 import arden.compiler.node.ACommavalueExprMixedTail;
 import arden.compiler.node.AConcludeThenPhrase;
 import arden.compiler.node.AConcreteExprIndeterminate;
@@ -600,7 +599,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadIntegerConstant(0);
 		context.writer.storeIntVariable(loopIndexVar);
 		
-		final Label loop = new Label();
+		final Label next = new Label();
 		final Label success = new Label();
 		final Label fail = new Label();
 		
@@ -612,14 +611,14 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.jumpIfZero(success);
 
 			// for each message run the following generated code
-			context.writer.mark(loop);
+			context.writer.mark(next);
 			checkNotMessageWritten(fail, expr);
 			context.writer.incVariable(loopIndexVar, 1);
 			context.writer.loadIntVariable(loopIndexVar);
 			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(success);
-			context.writer.jump(loop);
+			context.writer.jump(next);
 			// endfor
 			
 			// fail
@@ -638,13 +637,13 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.invokeStatic(ScenarioMethods.assertTrue);
 
 			// for each message run the following generated code
-			context.writer.mark(loop);
+			context.writer.mark(next);
 			checkMessageWritten(success, expr);
 			context.writer.incVariable(loopIndexVar, 1);
 			context.writer.loadIntVariable(loopIndexVar);
 			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
-			context.writer.jumpIfNonZero(loop);
+			context.writer.jumpIfNonZero(next);
 			// endfor
 			
 			// fail
@@ -839,9 +838,9 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	/** Requires that an array of {@link Call}s must be loaded in the loopItemsVar variable! */
 	private void checkCall(boolean not, PExprMixed argsExpr, PExprIndeterminate delayExpr) {
-		// index = -1
+		// index = -1; because of do-while loop
 		loopIndexVar = context.allocateVariable();
-		context.writer.loadIntegerConstant(0);
+		context.writer.loadIntegerConstant(-1);
 		context.writer.storeIntVariable(loopIndexVar);
 		
 		final Label next = new Label();
@@ -849,25 +848,45 @@ public final class ScenarioCompiler extends VisitorBase {
 		final Label fail = new Label();
 		
 		if (not) {
-			// TODO not called
+			// check if nothing was called
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
+			context.writer.jumpIfZero(success);
 
-		} else {
-			context.writer.incVariable(loopIndexVar, -1);
+			// for each call run the following generated code
+			context.writer.mark(next);
+			context.writer.incVariable(loopIndexVar, 1);
+			context.writer.loadIntVariable(loopIndexVar);
+			context.writer.loadVariable(loopItemsVar);
+			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
+			context.writer.jumpIfZero(success); // not matching call found
+			checkArgsMatch(next, argsExpr); // go on if matched, else check next
+			checkDelayMatches(next, delayExpr); // fail if matched, else check next
+			// endfor
 			
+			// fail
+			context.writer.loadStringConstant("The call was made.");
+			context.writer.invokeStatic(ScenarioMethods.fail);
+			
+			// success
+			context.writer.markForwardJumpsOnly(success);
+		} else {
+			// for each message
 			context.writer.mark(next);
 			context.writer.incVariable(loopIndexVar, 1);
 			context.writer.loadIntVariable(loopIndexVar);
 			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(fail); // no calls left to check -> fail
-			checkArgsMatch(next, argsExpr); // try next call if not matched
-			checkDelayMatches(next, delayExpr);  // try next call if not matched
+			checkArgsMatch(next, argsExpr); // continue with next call if not matched
+			checkDelayMatches(next, delayExpr); // continue with next call if not matched
 			context.writer.jump(success); // not jump back -> success
 			// endfor
 
 			// fail
 			context.writer.markForwardJumpsOnly(fail);
-			context.writer.loadStringConstant("No matching call was found");
+			context.writer.loadStringConstant("A matching call was not made.");
 			context.writer.invokeStatic(ScenarioMethods.fail);
 
 			// success
@@ -888,7 +907,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		// get args array from MlmCall
 		final int argsVar = context.allocateVariable();
 		loadCurrentLoopItem(); 
-		context.writer.loadInstanceField(ScenarioMethods.mlmCallArgs);
+		context.writer.loadInstanceField(ScenarioMethods.callArgs);
 		context.writer.storeVariable(argsVar);
 
 		// index = 0
@@ -953,7 +972,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		// if not matches -> fail
 		if (delayExpr == null) {
 			loadCurrentLoopItem();
-			context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+			context.writer.loadInstanceField(ScenarioMethods.callDelay);
 			context.writer.invokeStatic(ScenarioMethods.isZeroDelay);
 			context.writer.jumpIfZero(fail); // delay not equal
 		} else {
@@ -968,7 +987,7 @@ public final class ScenarioCompiler extends VisitorBase {
 
 					// actual delay
 					loadCurrentLoopItem();
-					context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+					context.writer.loadInstanceField(ScenarioMethods.callDelay);
 
 					context.writer.invokeInstance(ScenarioMethods.equals);
 					context.writer.jumpIfZero(fail); // delay not equal
@@ -985,7 +1004,7 @@ public final class ScenarioCompiler extends VisitorBase {
 
 					// load delay
 					loadCurrentLoopItem();
-					context.writer.loadInstanceField(ScenarioMethods.mlmCallDelay);
+					context.writer.loadInstanceField(ScenarioMethods.callDelay);
 
 					// store in "IT" variable
 					int it = context.allocateItVariable();
@@ -1062,12 +1081,6 @@ public final class ScenarioCompiler extends VisitorBase {
 			public void caseACommavalueExprMixedTail(ACommavalueExprMixedTail node) {
 			    // expr_mixed_tail = {commavalue} expr_mixed_tail comma expr_indeterminate
 				node.getExprMixedTail().apply(this);
-				output.add(node.getExprIndeterminate());
-			}
-			
-			@Override
-			public void caseACommaExprMixedTail(ACommaExprMixedTail node) {
-			    // expr_mixed_tail = {comma} comma expr_indeterminate;
 				output.add(node.getExprIndeterminate());
 			}
 		});

@@ -751,8 +751,7 @@ expr_mixed =
 
 expr_mixed_tail = 
       {value} expr_indeterminate
-    | {commavalue} expr_mixed_tail comma expr_indeterminate
-    | {comma} comma expr_indeterminate;
+    | {commavalue} expr_mixed_tail comma expr_indeterminate;
     
 expr_indeterminate =
       {concrete} expr_sort

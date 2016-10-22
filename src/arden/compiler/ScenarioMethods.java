@@ -26,8 +26,8 @@ final class ScenarioMethods {
 	public static final Method callEvent;
 	public static final Method setTime;
 	
-	public static final Field mlmCallDelay;
-	public static final Field mlmCallArgs;
+	public static final Field callDelay;
+	public static final Field callArgs;
 	
 	public static final Method assertNothingCalled;
 	public static final Method assertNothingReturned;
@@ -63,8 +63,8 @@ final class ScenarioMethods {
 			callEvent = ScenarioEngine.class.getMethod("callEvent", String.class, ArdenTime.class, ArdenTime.class);
 			setTime = ScenarioEngine.class.getMethod("setTime", ArdenTime.class);
 			
-			mlmCallDelay = Call.class.getDeclaredField("delay");
-			mlmCallArgs = Call.class.getDeclaredField("args");
+			callDelay = Call.class.getDeclaredField("delay");
+			callArgs = Call.class.getDeclaredField("args");
 			
 			assertNothingCalled = ScenarioExecutionContext.class.getMethod("assertNothingCalled", boolean.class);
 			assertNothingWritten = ScenarioExecutionContext.class.getMethod("assertNothingWritten", boolean.class, String.class);
