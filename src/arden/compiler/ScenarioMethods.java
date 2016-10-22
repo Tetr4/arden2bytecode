@@ -19,6 +19,7 @@ final class ScenarioMethods {
 	public static final Method setInterface;
 	public static final Method getWrittenMessages;
 	public static final Method getReturnedValues;
+	public static final Method getConclude;
 	public static final Method getMlmCalls;
 	public static final Method getEventCalls;
 	public static final Method callMlm;
@@ -32,10 +33,11 @@ final class ScenarioMethods {
 	public static final Method assertNothingReturned;
 	public static final Method assertNothingWritten;
 	public static final Method assertIsTriggered;
-	public static final Method assertConclude;
 	
 	public static final Method assertTrue;
+	public static final Method assertFalse;
 	public static final Method assertEquals;
+	public static final Method assertNotEquals;
 	public static final Method fail;
 	public static final Method equals;
 	
@@ -56,6 +58,7 @@ final class ScenarioMethods {
 			getMlmCalls = ScenarioExecutionContext.class.getMethod("getMlmCalls", MedicalLogicModule.class);
 			getEventCalls = ScenarioExecutionContext.class.getMethod("getEventCalls", String.class);
 			getReturnedValues = ScenarioEngine.class.getMethod("getReturnedValues");
+			getConclude = ScenarioEngine.class.getMethod("getConclude");
 			callMlm = ScenarioEngine.class.getMethod("callMlm", ArdenValue[].class);
 			callEvent = ScenarioEngine.class.getMethod("callEvent", String.class, ArdenTime.class, ArdenTime.class);
 			setTime = ScenarioEngine.class.getMethod("setTime", ArdenTime.class);
@@ -67,10 +70,11 @@ final class ScenarioMethods {
 			assertNothingWritten = ScenarioExecutionContext.class.getMethod("assertNothingWritten", boolean.class, String.class);
 			assertNothingReturned = ScenarioEngine.class.getMethod("assertNothingReturned", boolean.class);
 			assertIsTriggered = ScenarioEngine.class.getMethod("assertIsTriggered", boolean.class);
-			assertConclude = ScenarioEngine.class.getMethod("assertConclude", boolean.class, ArdenValue.class);
 			
 			assertTrue = Assert.class.getMethod("assertTrue", String.class, boolean.class);
+			assertFalse = Assert.class.getMethod("assertFalse", String.class, boolean.class);
 			assertEquals = Assert.class.getMethod("assertEquals", String.class, Object.class, Object.class);
+			assertNotEquals = Assert.class.getMethod("assertNotEquals", String.class, Object.class, Object.class);
 			fail = Assert.class.getMethod("fail", String.class);
 			equals = Object.class.getMethod("equals", Object.class);
 			

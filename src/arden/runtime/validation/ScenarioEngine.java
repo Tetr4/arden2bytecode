@@ -101,18 +101,8 @@ public class ScenarioEngine {
 		}
 	}
 
-	public void assertConclude(boolean not, ArdenValue expected) {
-		if (not) {
-			if (conclude != null) {
-				Assert.assertNotEquals("Conclude matched", expected, conclude);
-			}
-		} else {
-			if (conclude == null) {
-				Assert.fail();
-			} else {
-				Assert.assertEquals("Conclude did not match", expected, conclude);
-			}
-		}
+	public ArdenValue getConclude() {
+		return conclude;
 	}
 
 	public void assertNothingReturned(boolean not) {

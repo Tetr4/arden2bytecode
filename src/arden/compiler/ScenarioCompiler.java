@@ -335,11 +335,100 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseAConcludeThenPhrase(AConcludeThenPhrase node) {
-		// then_phrase = {conclude} conclude should not? be expr
-		context.writer.loadVariable(engineVar);
-		loadBoolean(node.getNot() != null);
-		node.getExpr().apply(new ExpressionCompiler(context));
-		context.writer.invokeInstance(ScenarioMethods.assertConclude);
+		// then_phrase = {conclude} conclude should not? be expr_indeterminate
+		if (node.getNot() != null) {
+			checkNotConclude(node.getExprIndeterminate());
+		} else {
+			checkConclude(node.getExprIndeterminate());
+		}
+
+	}
+
+	private void checkConclude(PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
+
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				context.writer.loadStringConstant("Wrong conclude value");
+				
+				 // expected
+				node.getExprSort().apply(this);
+				
+				// actual
+				context.writer.loadVariable(engineVar);
+				context.writer.invokeInstance(ScenarioMethods.getConclude);
+				context.writer.invokeStatic(ScenarioMethods.assertEquals);
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				context.writer.loadVariable(engineVar);
+				context.writer.invokeInstance(ScenarioMethods.getConclude);
+
+				// store in "IT" variable
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this); // expected
+				context.popItVariable();
+
+				context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+				context.writer.loadStringConstant("Conclude value did not match");
+				context.writer.swap();
+				context.writer.invokeStatic(ScenarioMethods.assertTrue);
+			}
+		});
+	}
+
+	private void checkNotConclude(PExprIndeterminate expr) {
+		expr.apply(new ExpressionCompiler(context) {
+
+			@Override
+			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
+				// expr_indeterminate = {concrete} expr_sort
+				context.writer.loadStringConstant("Conclude matched");
+				
+				 // expected
+				node.getExprSort().apply(this);
+				
+				// actual
+				context.writer.loadVariable(engineVar);
+				context.writer.invokeInstance(ScenarioMethods.getConclude);
+				context.writer.invokeStatic(ScenarioMethods.assertNotEquals);
+			}
+
+			@Override
+			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
+				// expr_indeterminate = {any} anything
+				context.writer.loadStringConstant("Conclude matched");
+				context.writer.invokeStatic(ScenarioMethods.fail);
+			}
+
+			@Override
+			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
+				// expr_indeterminate = {filter} anything where expr_sort;
+				context.writer.loadVariable(engineVar);
+				context.writer.invokeInstance(ScenarioMethods.getConclude);
+
+				// store in "IT" variable
+				int it = context.allocateItVariable();
+				context.writer.storeVariable(it);
+				node.getExprSort().apply(this); // expected
+				context.popItVariable();
+
+				context.writer.invokeStatic(ScenarioMethods.isValidFilterResult);
+				context.writer.loadStringConstant("Conclude value matched");
+				context.writer.swap();
+				context.writer.invokeStatic(ScenarioMethods.assertFalse);
+			}
+		});
+		
 	}
 
 	@Override
