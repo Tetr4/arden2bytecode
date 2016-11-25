@@ -199,7 +199,6 @@ Tokens
   all         = a l l;
   and         = a n d;
   any         = a n y;
-  anything    = a n y t h i n g;
   arccos      = a r c c o s;
   arcsin      = a r c s i n;
   arctan      = a r c t a n;
@@ -225,6 +224,7 @@ Tokens
   citations   = c i t a t i o n s;
   {normal -> text}citations_colon   = c i t a t i o n s ':';
   conclude    = c o n c l u d e;
+  concluded   = c o n c l u d e d;  
   cos         = c o s;
   cosine      = c o s i n e;
   count       = c o u n t;
@@ -416,6 +416,7 @@ Tokens
   urgency_colon = u r g e n c y ':';
   validation  = v a l i d a t i o n;
   validation_colon = v a l i d a t i o n ':';
+  value       = v a l u e;
   variance    = v a r i a n c e;
   version     = v e r s i o n;
   {normal-> text} version_colon = v e r s i o n ':';
@@ -720,21 +721,21 @@ const_time =
     
 then_phrase =
       {trigger} T.mlm should not? be triggered
-    | {conclude} expr_indeterminate should not? be conclude
+    | {conclude} expr_any should not? be concluded
     | {returnnothing} nothing should not? be returned
-    | {return} expr_mixed should not? be returned
-    | {write} expr_indeterminate should not? be written
-    | {writeat} expr_indeterminate should not? be written at destination? mapping_factor
+    | {return} expr_any expr_any_tail? should not? be returned
+    | {write} expr_any should not? be written
+    | {writeat} expr_any should not? be written at destination? mapping_factor
     | {writemsg} message? mapping_factor should not? be written
     | {writemsgat} message? [msgmapping]:mapping_factor should not? be written at destination? [destmapping]:mapping_factor
     | {writenothing} nothing should not? be written
     | {writenothingat} nothing should not? be written at destination? mapping_factor
     | {call} mlm_definition should not? be called
-    | {callargs} mlm_definition should not? be called with expr_mixed
-    | {calldelay} mlm_definition should not? be called delay expr_indeterminate
-    | {calldelayargs} mlm_definition should not? be called with expr_mixed delay expr_indeterminate
+    | {callargs} mlm_definition should not? be called with expr_any expr_any_tail?
+    | {calldelay} mlm_definition should not? be called delay [expr_delay]:expr_any
+    | {calldelayargs} mlm_definition should not? be called with expr_any expr_any_tail? delay [expr_delay]:expr_any
     | {callevt} event? mapping_factor should not? be called
-    | {callevtdelay} event? mapping_factor should not? be called delay expr_indeterminate
+    | {callevtdelay} event? mapping_factor should not? be called delay [expr_delay]:expr_any
     | {callnothing} nothing should not? be called;
 
 mlm_definition =
@@ -744,19 +745,19 @@ mlm_definition =
 
 /****** validation expressions ******/
 
-/* comma separated list of constant expressions and indeterminate expressions */
-expr_mixed =
-       expr_indeterminate
-    |  {tail} expr_indeterminate comma expr_mixed_tail;
-
-expr_mixed_tail = 
-      {value} expr_indeterminate
-    | {commavalue} expr_mixed_tail comma expr_indeterminate;
+/*
+ * A comma separated list of matcher expressions. Used for multiple return
+ * values or call parameters. Split into head and tail to solve a shift-reduce
+ * conflict.
+ */
+expr_any_tail = 
+      {value} comma expr_any
+    | {commavalue} comma expr_any expr_any_tail;
     
-expr_indeterminate =
+expr_any =
       {concrete} expr_sort
-    | {any} anything
-    | {filter} anything where expr_sort;
+    | {any} any value
+    | {filter} any value where expr_sort;
 
 
 /****** logic block ******/

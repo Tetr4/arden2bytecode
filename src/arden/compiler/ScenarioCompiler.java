@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 import arden.codegenerator.Label;
-import arden.compiler.node.AAnyExprIndeterminate;
+import arden.compiler.node.AAnyExprAny;
 import arden.compiler.node.AAssGivenPhrase;
 import arden.compiler.node.ACallThenPhrase;
 import arden.compiler.node.ACallWhenPhrase;
@@ -19,14 +19,13 @@ import arden.compiler.node.ACallevtdelayThenPhrase;
 import arden.compiler.node.ACallevttimeWhenPhrase;
 import arden.compiler.node.ACallevttimetimeWhenPhrase;
 import arden.compiler.node.ACallnothingThenPhrase;
-import arden.compiler.node.ACommavalueExprMixedTail;
+import arden.compiler.node.ACommavalueExprAnyTail;
 import arden.compiler.node.AConcludeThenPhrase;
-import arden.compiler.node.AConcreteExprIndeterminate;
+import arden.compiler.node.AConcreteExprAny;
 import arden.compiler.node.ADateConstTime;
 import arden.compiler.node.ADtimeConstTime;
 import arden.compiler.node.AEmptyScenarioBlock;
-import arden.compiler.node.AExprMixed;
-import arden.compiler.node.AFilterExprIndeterminate;
+import arden.compiler.node.AFilterExprAny;
 import arden.compiler.node.AGblkGivenBlockAnd;
 import arden.compiler.node.AGblkScenarioBlock;
 import arden.compiler.node.AGstmtGivenBlockAnd;
@@ -41,7 +40,6 @@ import arden.compiler.node.ASblkGivenBlockAnd;
 import arden.compiler.node.ASblkThenBlockAnd;
 import arden.compiler.node.ASblkWhenBlockAnd;
 import arden.compiler.node.AScenarioSlot;
-import arden.compiler.node.ATailExprMixed;
 import arden.compiler.node.ATblkScenarioBlock;
 import arden.compiler.node.ATblkThenBlockAnd;
 import arden.compiler.node.ATimeWhenPhrase;
@@ -49,7 +47,7 @@ import arden.compiler.node.ATimealiasWhenPhrase;
 import arden.compiler.node.ATriggerThenPhrase;
 import arden.compiler.node.ATstmtScenarioBlock;
 import arden.compiler.node.ATstmtThenBlockAnd;
-import arden.compiler.node.AValueExprMixedTail;
+import arden.compiler.node.AValueExprAnyTail;
 import arden.compiler.node.AWblkScenarioBlock;
 import arden.compiler.node.AWblkWhenBlockAnd;
 import arden.compiler.node.AWriteThenPhrase;
@@ -60,8 +58,8 @@ import arden.compiler.node.AWritenothingThenPhrase;
 import arden.compiler.node.AWritenothingatThenPhrase;
 import arden.compiler.node.AWstmtScenarioBlock;
 import arden.compiler.node.AWstmtWhenBlockAnd;
-import arden.compiler.node.PExprIndeterminate;
-import arden.compiler.node.PExprMixed;
+import arden.compiler.node.PExprAny;
+import arden.compiler.node.PExprAnyTail;
 import arden.runtime.ArdenTime;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.validation.Call;
@@ -334,21 +332,21 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseAConcludeThenPhrase(AConcludeThenPhrase node) {
-		// then_phrase = {conclude} conclude should not? be expr_indeterminate
+		// then_phrase = {conclude} expr_any should not? be concluded
 		if (node.getNot() != null) {
-			checkNotConclude(node.getExprIndeterminate());
+			checkNotConclude(node.getExprAny());
 		} else {
-			checkConclude(node.getExprIndeterminate());
+			checkConclude(node.getExprAny());
 		}
 
 	}
 
-	private void checkConclude(PExprIndeterminate expr) {
+	private void checkConclude(PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				context.writer.loadStringConstant("Wrong conclude value");
 				
 				 // expected
@@ -361,13 +359,13 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				context.writer.loadVariable(engineVar);
 				context.writer.invokeInstance(ScenarioMethods.getConclude);
 
@@ -385,12 +383,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		});
 	}
 
-	private void checkNotConclude(PExprIndeterminate expr) {
+	private void checkNotConclude(PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				context.writer.loadStringConstant("Conclude matched");
 				
 				 // expected
@@ -403,15 +401,15 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 				context.writer.loadStringConstant("Conclude matched");
 				context.writer.invokeStatic(ScenarioMethods.fail);
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				context.writer.loadVariable(engineVar);
 				context.writer.invokeInstance(ScenarioMethods.getConclude);
 
@@ -432,12 +430,20 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseAReturnThenPhrase(AReturnThenPhrase node) {
-		// then_phrase = {return} expr_mixed should not? be returned
-		List<PExprIndeterminate> expressions = toCommaSeparatedList(node.getExprMixed());
+		// then_phrase = {return} expr_any expr_any_tail? should not? be returned
+		List<PExprAny> expressions = toCommaSeparatedList(node.getExprAny(), node.getExprAnyTail());
 		checkReturned(expressions, node.getNot() != null);
 	}
 	
-	private void checkReturned(List<PExprIndeterminate> expressions, boolean not) {
+	@Override
+	public void caseAReturnnothingThenPhrase(AReturnnothingThenPhrase node) {
+		// then_phrase = {returnnothing} nothing should not? be returned
+		context.writer.loadVariable(engineVar);
+		loadBoolean(node.getNot() != null);
+		context.writer.invokeInstance(ScenarioMethods.assertNothingReturned);
+	}
+
+	private void checkReturned(List<PExprAny> expressions, boolean not) {
 		// get return values array
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(engineVar);
@@ -457,7 +463,7 @@ public final class ScenarioCompiler extends VisitorBase {
 			final Label success = new Label();
 			context.writer.jumpIfZero(success);
 
-			for (PExprIndeterminate expr : expressions) {
+			for (PExprAny expr : expressions) {
 				checkNotReturnExpression(success, expr);
 				context.writer.incVariable(loopIndexVar, 1);
 			}
@@ -474,19 +480,19 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.loadVariable(loopItemsVar); // actual
 			context.writer.invokeStatic(ScenarioMethods.assertSameNumberOfReturnValues);
 
-			for (PExprIndeterminate expr : expressions) {
+			for (PExprAny expr : expressions) {
 				checkReturnExpression(expr);
 				context.writer.incVariable(loopIndexVar, 1);
 			}
 		}
 	}
 	
-	private void checkNotReturnExpression(final Label success, PExprIndeterminate expr) {
+	private void checkNotReturnExpression(final Label success, PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				node.getExprSort().apply(this); // expected
 				loadCurrentLoopItem(); // actual
 				context.writer.invokeInstance(ScenarioMethods.equals);
@@ -494,13 +500,13 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				loadCurrentLoopItem();
 
 				// store in "IT" variable
@@ -516,12 +522,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		});
 	}
 
-	private void checkReturnExpression(PExprIndeterminate expr) {
+	private void checkReturnExpression(PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				context.writer.loadStringConstant("Wrong return value");
 				node.getExprSort().apply(this); // expected
 				loadCurrentLoopItem(); // actual
@@ -529,13 +535,13 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				loadCurrentLoopItem();
 
 				// store in "IT" variable
@@ -559,27 +565,19 @@ public final class ScenarioCompiler extends VisitorBase {
 	}	
 	
 	@Override
-	public void caseAReturnnothingThenPhrase(AReturnnothingThenPhrase node) {
-		// then_phrase = {returnnothing} nothing should not? be returned
-		context.writer.loadVariable(engineVar);
-		loadBoolean(node.getNot() != null);
-		context.writer.invokeInstance(ScenarioMethods.assertNothingReturned);
-	}
-	
-	@Override
 	public void caseAWriteThenPhrase(AWriteThenPhrase node) {
-		// then_phrase = {write} expr_indeterminate should not? be written
-		checkWritten(null, node.getExprIndeterminate(), node.getNot() != null);
+		// then_phrase = {write} expr_any should not? be written
+		checkWritten(null, node.getExprAny(), node.getNot() != null);
 	}
 	
 	@Override
 	public void caseAWriteatThenPhrase(AWriteatThenPhrase node) {
-		// then_phrase = {writeat} expr_indeterminate should not? be written at destination? mapping_factor
+		// then_phrase = {writeat} expr_any should not? be written at destination? mapping_factor
 		String destinationMapping = ParseHelpers.getStringForMapping(node.getMappingFactor());
-		checkWritten(destinationMapping, node.getExprIndeterminate(), node.getNot() != null);
+		checkWritten(destinationMapping, node.getExprAny(), node.getNot() != null);
 	}
 	
-	private void checkWritten(String destination, PExprIndeterminate expr, boolean not) {
+	private void checkWritten(String destination, PExprAny expr, boolean not) {
 		// get messages array
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
@@ -655,12 +653,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		}
 	}
 	
-	private void checkMessageWritten(final Label success, PExprIndeterminate expr) {
+	private void checkMessageWritten(final Label success, PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				node.getExprSort().apply(this); // expected
 				loadCurrentLoopItem(); // actual
 				context.writer.invokeInstance(ScenarioMethods.equals);
@@ -668,14 +666,14 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 				context.writer.jump(success);
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				loadCurrentLoopItem();
 
 				// store in "IT" variable
@@ -691,12 +689,12 @@ public final class ScenarioCompiler extends VisitorBase {
 		});
 	}
 
-	private void checkNotMessageWritten(final Label fail, PExprIndeterminate expr) {
+	private void checkNotMessageWritten(final Label fail, PExprAny expr) {
 		expr.apply(new ExpressionCompiler(context) {
 
 			@Override
-			public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-				// expr_indeterminate = {concrete} expr_sort
+			public void caseAConcreteExprAny(AConcreteExprAny node) {
+				// expr_any = {concrete} expr_sort
 				node.getExprSort().apply(this); // expected
 				loadCurrentLoopItem(); // actual
 				context.writer.invokeInstance(ScenarioMethods.equals);
@@ -704,14 +702,14 @@ public final class ScenarioCompiler extends VisitorBase {
 			}
 
 			@Override
-			public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-				// expr_indeterminate = {any} anything
+			public void caseAAnyExprAny(AAnyExprAny node) {
+				// expr_any = {any} any value
 				context.writer.jump(fail);
 			}
 
 			@Override
-			public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-				// expr_indeterminate = {filter} anything where expr_sort;
+			public void caseAFilterExprAny(AFilterExprAny node) {
+				// expr_any = {filter} any value where expr_sort;
 				loadCurrentLoopItem();
 
 				// store in "IT" variable
@@ -802,42 +800,44 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseACallargsThenPhrase(ACallargsThenPhrase node) {
-		// then_phrase = {callargs} mlm_definition should not? be called with expr_mixed
+		// then_phrase = {callargs} mlm_definition should not? be called with expr_any expr_any_tail?
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
 		node.getMlmDefinition().apply(this);
 		context.writer.invokeInstance(ScenarioMethods.getMlmCalls);
 		context.writer.storeVariable(loopItemsVar);
 		
-		checkCall(node.getNot() != null, node.getExprMixed(), null);
+		List<PExprAny> params = toCommaSeparatedList(node.getExprAny(), node.getExprAnyTail());
+		checkCall(node.getNot() != null, params, null);
 	}
-
+	
 	@Override
 	public void caseACalldelayThenPhrase(ACalldelayThenPhrase node) {
-		// then_phrase = {calldelay} mlm_definition should not? be called delay expr_indeterminate
+		// then_phrase = {calldelay} mlm_definition should not? be called delay [expr_delay]:expr_any
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
 		node.getMlmDefinition().apply(this);
 		context.writer.invokeInstance(ScenarioMethods.getMlmCalls);
 		context.writer.storeVariable(loopItemsVar);
 		
-		checkCall(node.getNot() != null, null, node.getExprIndeterminate());
+		checkCall(node.getNot() != null, null, node.getExprDelay());
 	}
 
 	@Override
 	public void caseACalldelayargsThenPhrase(ACalldelayargsThenPhrase node) {
-		// then_phrase = {calldelayargs} mlm_definition should not? be called with expr_mixed delay expr_indeterminate
+		// then_phrase = {calldelayargs} mlm_definition should not? be called with expr_any expr_any_tail? delay [expr_delay]:expr_any
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
 		node.getMlmDefinition().apply(this);
 		context.writer.invokeInstance(ScenarioMethods.getMlmCalls); // Returns object of type "Call"
 		context.writer.storeVariable(loopItemsVar);
 		
-		checkCall(node.getNot() != null, node.getExprMixed(), node.getExprIndeterminate());
+		List<PExprAny> params = toCommaSeparatedList(node.getExprAny(), node.getExprAnyTail());
+		checkCall(node.getNot() != null, params, node.getExprDelay());
 	}
 
 	/** Requires that an array of {@link Call}s must be loaded in the loopItemsVar variable! */
-	private void checkCall(boolean not, PExprMixed argsExpr, PExprIndeterminate delayExpr) {
+	private void checkCall(boolean not, List<PExprAny> args, PExprAny delay) {
 		// index = -1; because of do-while loop
 		loopIndexVar = context.allocateVariable();
 		context.writer.loadIntegerConstant(-1);
@@ -861,8 +861,8 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(success); // not matching call found
-			checkArgsMatch(next, argsExpr); // go on if matched, else check next
-			checkDelayMatches(next, delayExpr); // fail if matched, else check next
+			checkArgsMatch(next, args); // go on if matched, else check next
+			checkDelayMatches(next, delay); // fail if matched, else check next
 			// endfor
 			
 			// fail
@@ -879,8 +879,8 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.loadVariable(loopItemsVar);
 			context.writer.invokeStatic(ScenarioMethods.moreItemsAvailable);
 			context.writer.jumpIfZero(fail); // no calls left to check -> fail
-			checkArgsMatch(next, argsExpr); // continue with next call if not matched
-			checkDelayMatches(next, delayExpr); // continue with next call if not matched
+			checkArgsMatch(next, args); // continue with next call if not matched
+			checkDelayMatches(next, delay); // continue with next call if not matched
 			context.writer.jump(success); // not jump back -> success
 			// endfor
 
@@ -895,13 +895,10 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 	
 	/** Generates code that jumps to fail label if args do not match  */
-	private void checkArgsMatch(final Label fail, PExprMixed argsExpr) {
+	private void checkArgsMatch(final Label fail, List<PExprAny> args) {
 		// for each arg if not matches -> fail
-		List<PExprIndeterminate> args;
-		if (argsExpr == null) {
+		if (args == null) {
 			args = Collections.emptyList();
-		} else {
-			args = toCommaSeparatedList(argsExpr);
 		}
 		
 		// get args array from MlmCall
@@ -921,13 +918,13 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.invokeStatic(ScenarioMethods.isSameNumberOfValues);
 		context.writer.jumpIfZero(fail); // not same number of args
 
-		for (PExprIndeterminate argExpr : args) {
+		for (PExprAny argExpr : args) {
 			
 			argExpr.apply(new ExpressionCompiler(context) {
 
 				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
+				public void caseAConcreteExprAny(AConcreteExprAny node) {
+					// expr_any = {concrete} expr_sort
 					// expected
 					node.getExprSort().apply(this); 
 					
@@ -941,13 +938,13 @@ public final class ScenarioCompiler extends VisitorBase {
 				}
 
 				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
+				public void caseAAnyExprAny(AAnyExprAny node) {
+					// expr_any = {any} any value
 				}
 
 				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
+				public void caseAFilterExprAny(AFilterExprAny node) {
+					// expr_any = {filter} any value where expr_sort;
 					context.writer.loadVariable(argsVar);
 					context.writer.loadIntVariable(argsIndexVar);
 					context.writer.loadObjectFromArray();
@@ -968,19 +965,19 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 	
 	/** Generates code that jumps to fail label if delay does not match */
-	private void checkDelayMatches(final Label fail, PExprIndeterminate delayExpr) {
+	private void checkDelayMatches(final Label fail, PExprAny delay) {
 		// if not matches -> fail
-		if (delayExpr == null) {
+		if (delay == null) {
 			loadCurrentLoopItem();
 			context.writer.loadInstanceField(ScenarioMethods.callDelay);
 			context.writer.invokeStatic(ScenarioMethods.isZeroDelay);
 			context.writer.jumpIfZero(fail); // delay not equal
 		} else {
-			delayExpr.apply(new ExpressionCompiler(context) {
+			delay.apply(new ExpressionCompiler(context) {
 
 				@Override
-				public void caseAConcreteExprIndeterminate(AConcreteExprIndeterminate node) {
-					// expr_indeterminate = {concrete} expr_sort
+				public void caseAConcreteExprAny(AConcreteExprAny node) {
+					// expr_any = {concrete} expr_sort
 
 					// expected delay
 					node.getExprSort().apply(this);
@@ -994,13 +991,13 @@ public final class ScenarioCompiler extends VisitorBase {
 				}
 
 				@Override
-				public void caseAAnyExprIndeterminate(AAnyExprIndeterminate node) {
-					// expr_indeterminate = {any} anything
+				public void caseAAnyExprAny(AAnyExprAny node) {
+					// expr_any = {any} any value
 				}
 
 				@Override
-				public void caseAFilterExprIndeterminate(AFilterExprIndeterminate node) {
-					// expr_indeterminate = {filter} anything where expr_sort;
+				public void caseAFilterExprAny(AFilterExprAny node) {
+					// expr_any = {filter} any value where expr_sort;
 
 					// load delay
 					loadCurrentLoopItem();
@@ -1033,14 +1030,14 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseACallevtdelayThenPhrase(ACallevtdelayThenPhrase node) {
-		// then_phrase = {callevtdelay} event? mapping_factor should not? be called delay expr_indeterminate
+		// then_phrase = {callevtdelay} event? mapping_factor should not? be called delay [expr_delay]:expr_any
 		loopItemsVar = context.allocateVariable();
 		context.writer.loadVariable(contextVar);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
 		context.writer.invokeInstance(ScenarioMethods.getEventCalls); // Returns object of type "Call"
 		context.writer.storeVariable(loopItemsVar);
 		
-		checkCall(node.getNot() != null, null, node.getExprIndeterminate());
+		checkCall(node.getNot() != null, null, node.getExprDelay());
 	}
 
 	@Override
@@ -1055,35 +1052,30 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadIntegerConstant(b ? 1 : 0);
 	}
 	
-	private List<PExprIndeterminate> toCommaSeparatedList(PExprMixed expr) {
-		final ArrayList<PExprIndeterminate> output = new ArrayList<>();
-		expr.apply(new VisitorBase() {
-			@Override
-			public void caseAExprMixed(AExprMixed node) {
-				// expr_mixed = expr_indeterminate
-				output.add(node.getExprIndeterminate());
-			}
-			
-			@Override
-			public void caseATailExprMixed(ATailExprMixed node) {
-				// expr_mixed = expr_indeterminate comma expr_mixed_tail
-				output.add(node.getExprIndeterminate());
-				node.getExprMixedTail().apply(this);
-			}
-			
-			@Override
-			public void caseAValueExprMixedTail(AValueExprMixedTail node) {
-				// expr_mixed_tail = {value} expr_indeterminate
-				output.add(node.getExprIndeterminate());
-			}
-			
-			@Override
-			public void caseACommavalueExprMixedTail(ACommavalueExprMixedTail node) {
-			    // expr_mixed_tail = {commavalue} expr_mixed_tail comma expr_indeterminate
-				node.getExprMixedTail().apply(this);
-				output.add(node.getExprIndeterminate());
-			}
-		});
+	private List<PExprAny> toCommaSeparatedList(PExprAny head, PExprAnyTail tail) {
+		final List<PExprAny> output = new ArrayList<>();
+		if (head != null) {
+			output.add(head);
+		}
+
+		if (tail != null) {
+			tail.apply(new VisitorBase() {
+				
+				@Override
+				public void caseAValueExprAnyTail(AValueExprAnyTail node) {
+					// expr_any_tail = {value} comma expr_any
+					output.add(node.getExprAny());
+				}
+				
+				@Override
+				public void caseACommavalueExprAnyTail(ACommavalueExprAnyTail node) {
+					// expr_any_tail = {commavalue} comma expr_any expr_any_tail;
+					output.add(node.getExprAny());
+					node.getExprAnyTail().apply(this);
+				}
+			});
+		}
+
 		return output;
 	}
 	
