@@ -81,9 +81,9 @@ public class DataSlotTest extends SpecificationTest {
 				.setName("other_mlm")
 				.addData("test_event := EVENT {" + event + "};")
 				.addEvoke("test_event;")
-				.addAction("IF test_event THEN RETURN 1;")
+				.addAction("IF test_event THEN RETURN TRUE;")
 				.addAction("ENDIF;")
-				.addAction("RETURN 0;")
+				.addAction("RETURN FALSE;")
 				.toString();
 		String eventAsBoolean = createEmptyLogicSlotCodeBuilder()
 				.addMlm(other_mlm)
@@ -92,7 +92,7 @@ public class DataSlotTest extends SpecificationTest {
 				.addLogic("CONCLUDE TRUE;")
 				.addAction("RETURN x;")
 				.toString();
-		assertReturns(eventAsBoolean, "1");
+		assertReturns(eventAsBoolean, "(,TRUE)");
 	}
 
 	@Test

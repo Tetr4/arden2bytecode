@@ -31,13 +31,13 @@ import java.lang.reflect.Modifier;
 
 import arden.codegenerator.FieldReference;
 import arden.compiler.node.TIdentifier;
+import arden.runtime.ArdenValue;
 
 /**
- * DESTINATION Variable.
- * 
- * An instance field of type String is stored in the MLM implementation class.
- * It is set in the data block where the 'x := DESTINATION y' statement occurs
- * and used for WRITE AT statements.
+ * An instance field of type {@link ArdenValue} is stored in the MLM
+ * implementation class. It is set in the data block where the
+ * <code>DESTINATION</code> or <code>DESTINATION AS</code> statement occurs and
+ * used for <code>WRITE AT</code> statements.
  */
 final class DestinationVariable extends Variable {
 	final FieldReference field;
@@ -58,10 +58,11 @@ final class DestinationVariable extends Variable {
 		if (variable instanceof DestinationVariable) {
 			return (DestinationVariable) variable;
 		} else {
-			FieldReference mlmField = codeGen.createField(ident.getText(), String.class, Modifier.PRIVATE);
+			FieldReference mlmField = codeGen.createField(ident.getText(), ArdenValue.class, Modifier.PRIVATE);
 			DestinationVariable dv = new DestinationVariable(ident, mlmField);
 			codeGen.addVariable(dv);
 			return dv;
 		}
 	}
+	
 }

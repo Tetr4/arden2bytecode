@@ -37,7 +37,6 @@ import java.util.regex.Pattern;
 
 import arden.runtime.evoke.AfterTrigger;
 import arden.runtime.evoke.CyclicTrigger;
-import arden.runtime.evoke.NeverTrigger;
 import arden.runtime.evoke.Trigger;
 import arden.runtime.evoke.UntilTrigger;
 
@@ -720,7 +719,7 @@ public final class ExpressionHelpers {
 				bestIndex = i;
 			}
 		}
-		return ArdenNumber.create(bestIndex + 1, arr[bestIndex].primaryTime);
+		return ArdenNumber.create(bestIndex + 1, ArdenValue.NOPRIMARYTIME);
 	}
 
 	/** implements the [] (element) operator */
@@ -822,11 +821,6 @@ public final class ExpressionHelpers {
 			return cycleTrigger;
 		}
 		throw new RuntimeException("cannot create until trigger for type " + getClassName(untilExpr) + " after the 'until'");
-	}
-	
-	/** returns the Trigger when 'call' is stated in the evoke slot */
-	public static Trigger evokeSlotCall() {
-		return new NeverTrigger();
 	}
 	
 	public static ArdenValue extractTimeComponent(ArdenValue time, int component) {

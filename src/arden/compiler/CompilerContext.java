@@ -42,6 +42,7 @@ final class CompilerContext {
 	public final int executionContextVariable;
 	public final int selfMLMVariable;
 	public final int argumentsVariable;
+	public final int triggerVariable;
 	private int nextFreeVariable;
 	/** Stack of currently active 'it' variables */
 	private Stack<Integer> itVariables = new Stack<Integer>();
@@ -55,14 +56,22 @@ final class CompilerContext {
 			executionContextVariable = 1;
 		else
 			executionContextVariable = -1;
+
 		if (parameters >= 2)
 			selfMLMVariable = 2;
 		else
 			selfMLMVariable = -1;
+
 		if (parameters >= 3)
 			argumentsVariable = 3;
 		else
 			argumentsVariable = -1;
+
+		if (parameters >= 4)
+			triggerVariable = 4;
+		else
+			triggerVariable = -1;
+
 		nextFreeVariable = parameters + 1;
 	}
 

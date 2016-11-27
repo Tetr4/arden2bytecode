@@ -31,10 +31,56 @@ import java.util.ArrayList;
 import java.util.List;
 
 import arden.codegenerator.Label;
-import arden.compiler.node.*;
+import arden.compiler.node.AArgDataAssignPhrase;
+import arden.compiler.node.AAssDataStatement;
+import arden.compiler.node.ABlockDataBlock;
+import arden.compiler.node.ACphrDataAssignPhrase;
+import arden.compiler.node.ADasmapDataAssignPhrase;
+import arden.compiler.node.ADataIfThenElse2;
+import arden.compiler.node.ADataSlot;
+import arden.compiler.node.ADmapDataAssignPhrase;
+import arden.compiler.node.AElseDataElseif;
+import arden.compiler.node.AElseifDataElseif;
+import arden.compiler.node.AEmapDataAssignPhrase;
+import arden.compiler.node.AEmptyDataStatement;
+import arden.compiler.node.AEndDataElseif;
+import arden.compiler.node.AExprDataAssignPhrase;
+import arden.compiler.node.AForDataStatement;
+import arden.compiler.node.AFuncDataBlock;
+import arden.compiler.node.AIdCallPhrase;
+import arden.compiler.node.AIdexCallPhrase;
+import arden.compiler.node.AIfDataStatement;
+import arden.compiler.node.AImapDataAssignPhrase;
+import arden.compiler.node.AIphrDataAssignment;
+import arden.compiler.node.ALaargDataAssignment;
+import arden.compiler.node.ALlbargDataAssignment;
+import arden.compiler.node.ALlphrDataAssignment;
+import arden.compiler.node.ALphrDataAssignment;
+import arden.compiler.node.AMasmapDataAssignPhrase;
+import arden.compiler.node.AMlmDataAssignPhrase;
+import arden.compiler.node.AMlmiDataAssignPhrase;
+import arden.compiler.node.AMlmsDataAssignPhrase;
+import arden.compiler.node.AMmapDataAssignPhrase;
+import arden.compiler.node.ANewobjDataAssignPhrase;
+import arden.compiler.node.ANullExprFactorAtom;
+import arden.compiler.node.AObjectDataAssignPhrase;
+import arden.compiler.node.AReadDataAssignPhrase;
+import arden.compiler.node.AReadasDataAssignPhrase;
+import arden.compiler.node.ATexprDataAssignment;
+import arden.compiler.node.AWhileDataStatement;
+import arden.compiler.node.PCallPhrase;
+import arden.compiler.node.PExpr;
+import arden.compiler.node.PReadPhrase;
+import arden.compiler.node.Switch;
+import arden.compiler.node.Switchable;
+import arden.compiler.node.TIdentifier;
+import arden.compiler.node.TStringLiteral;
+import arden.compiler.node.TTerm;
+import arden.runtime.ArdenEvent;
 import arden.runtime.ArdenValue;
 import arden.runtime.DatabaseQuery;
 import arden.runtime.ObjectType;
+import arden.runtime.evoke.Trigger;
 
 /**
  * Compiler for data block.
@@ -46,9 +92,15 @@ import arden.runtime.ObjectType;
  */
 final class DataCompiler extends VisitorBase {
 	private final CompilerContext context;
+	private final String institutionSelf;
 
-	public DataCompiler(CompilerContext context) {
+	public DataCompiler(CompilerContext context, String institutionSelf) {
 		this.context = context;
+		this.institutionSelf = institutionSelf;
+	}
+	
+	public DataCompiler(CompilerContext context) {
+		this(context, null);
 	}
 
 	// data_slot = data data_block semicolons;
@@ -177,7 +229,7 @@ final class DataCompiler extends VisitorBase {
 				// {readas} read as identifier read_phrase
 				final Variable v = context.codeGenerator.getVariableOrShowError(node.getIdentifier());
 				if (!(v instanceof ObjectTypeVariable))
-					throw new RuntimeCompilerException(lhs.getPosition(), "EVENT variables must be simple identifiers");
+					throw new RuntimeCompilerException(lhs.getPosition(), "The variable must contain an object declaration");
 				lhs.assign(context, new Switchable() {
 					@Override
 					public void apply(Switch sw) {
@@ -215,46 +267,59 @@ final class DataCompiler extends VisitorBase {
 			@Override
 			public void caseAImapDataAssignPhrase(AImapDataAssignPhrase node) {
 				// {imap} interface mapping_factor
-				CallableVariable var = CallableVariable.getCallableVariable(context.codeGenerator, lhs);
+				CallableVariable var = InterfaceVariable.getVariable(context.codeGenerator, lhs);
 				context.writer.sequencePoint(lhs.getPosition().getLine());
 				context.writer.loadThis();
 				context.writer.loadVariable(context.executionContextVariable);
 				context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
 				context.writer.invokeInstance(ExecutionContextMethods.findInterface);
-				context.writer.storeInstanceField(var.mlmField);
+				context.writer.storeInstanceField(var.runnableField);
 			}
 
 			@Override
 			public void caseAEmapDataAssignPhrase(AEmapDataAssignPhrase node) {
 				// {emap} event mapping_factor
-				EventVariable e = EventVariable.getEventVariable(context.codeGenerator, lhs);
+				EventVariable e = EventVariable.getVariable(context.codeGenerator, lhs);
 				context.writer.sequencePoint(lhs.getPosition().getLine());
 				context.writer.loadThis();
 				context.writer.loadVariable(context.executionContextVariable);
 				context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
 				context.writer.invokeInstance(ExecutionContextMethods.getEvent);
+				context.writer.loadThis();
+				context.writer.loadInstanceField(context.codeGenerator.getTriggerField());
+				context.writer
+						.invokeStatic(Compiler.getRuntimeHelper("flagEvokingEvent", ArdenEvent.class, Trigger.class));
 				context.writer.storeInstanceField(e.field);
 			}
 
 			@Override
 			public void caseAMmapDataAssignPhrase(AMmapDataAssignPhrase node) {
 				// {mmap} message mapping_factor
-				final String mappingString = ParseHelpers.getStringForMapping(node.getMappingFactor());
-				lhs.assign(context, new Switchable() {
-					@Override
-					public void apply(Switch sw) {
-						context.writer.loadVariable(context.executionContextVariable);
-						context.writer.loadStringConstant(mappingString);
-						context.writer.invokeInstance(ExecutionContextMethods.getMessage);
-					}
-				});
+				MessageVariable v = MessageVariable.getVariable(context.codeGenerator, lhs);
+				context.writer.loadThis();
+				context.writer.loadVariable(context.executionContextVariable);
+				String mappingString = ParseHelpers.getStringForMapping(node.getMappingFactor());
+				context.writer.loadStringConstant(mappingString);
+				context.writer.invokeInstance(ExecutionContextMethods.getMessage);
+				context.writer.storeInstanceField(v.field);
 			}
 
 			@Override
 			public void caseAMasmapDataAssignPhrase(AMasmapDataAssignPhrase node) {
 				// {masmap} message as identifier mapping_factor?
-				// TODO Auto-generated method stub
-				super.caseAMasmapDataAssignPhrase(node);
+				MessageVariable v = MessageVariable.getVariable(context.codeGenerator, lhs);
+				context.writer.loadThis();
+				context.writer.loadVariable(context.executionContextVariable);
+				String mappingString = ParseHelpers.getStringForMapping(node.getMappingFactor());
+				context.writer.loadStringConstant(mappingString);
+
+				Variable typeVariable = context.codeGenerator.getVariableOrShowError(node.getIdentifier());
+				if (!(typeVariable instanceof ObjectTypeVariable))
+					throw new RuntimeCompilerException(lhs.getPosition(), "The variable must contain an object declaration");
+				context.writer.loadStaticField(((ObjectTypeVariable) typeVariable).field);
+				
+				context.writer.invokeInstance(ExecutionContextMethods.getMessageAs);
+				context.writer.storeInstanceField(v.field);
 			}
 
 			@Override
@@ -262,15 +327,29 @@ final class DataCompiler extends VisitorBase {
 				// {dmap} destination mapping_factor
 				DestinationVariable v = DestinationVariable.getDestinationVariable(context.codeGenerator, lhs);
 				context.writer.loadThis();
-				context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
+				context.writer.loadVariable(context.executionContextVariable);
+				String mappingString = ParseHelpers.getStringForMapping(node.getMappingFactor());
+				context.writer.loadStringConstant(mappingString);
+				context.writer.invokeInstance(ExecutionContextMethods.getDestination);
 				context.writer.storeInstanceField(v.field);
 			}
 
 			@Override
 			public void caseADasmapDataAssignPhrase(ADasmapDataAssignPhrase node) {
 				// {dasmap} destination as identifier mapping_factor?
-				// TODO Auto-generated method stub
-				super.caseADasmapDataAssignPhrase(node);
+				DestinationVariable v = DestinationVariable.getDestinationVariable(context.codeGenerator, lhs);
+				context.writer.loadThis();
+				context.writer.loadVariable(context.executionContextVariable);
+				String mappingString = ParseHelpers.getStringForMapping(node.getMappingFactor());
+				context.writer.loadStringConstant(mappingString);
+
+				Variable typeVariable = context.codeGenerator.getVariableOrShowError(node.getIdentifier());
+				if (!(typeVariable instanceof ObjectTypeVariable))
+					throw new RuntimeCompilerException(lhs.getPosition(), "The variable must contain an object declaration");
+				context.writer.loadStaticField(((ObjectTypeVariable) typeVariable).field);
+				
+				context.writer.invokeInstance(ExecutionContextMethods.getDestinationAs);
+				context.writer.storeInstanceField(v.field);
 			}
 
 			@Override
@@ -339,7 +418,7 @@ final class DataCompiler extends VisitorBase {
 
 	/** Creates an MLM variable. */
 	private void createMlmVariable(LeftHandSideResult lhs, TTerm name, TStringLiteral institution) {
-		CallableVariable var = CallableVariable.getCallableVariable(context.codeGenerator, lhs);
+		CallableVariable var = MedicalLogicModuleVariable.getVariable(context.codeGenerator, lhs);
 		context.writer.sequencePoint(lhs.getPosition().getLine());
 		context.writer.loadThis();
 		if (name == null) {
@@ -350,11 +429,11 @@ final class DataCompiler extends VisitorBase {
 			if (institution != null) {
 				context.writer.loadStringConstant(ParseHelpers.getLiteralStringValue(institution));
 			} else {
-				context.writer.loadNull();
+				context.writer.loadStringConstant(institutionSelf);
 			}
 			context.writer.invokeInstance(ExecutionContextMethods.findModule);
 		}
-		context.writer.storeInstanceField(var.mlmField);
+		context.writer.storeInstanceField(var.runnableField);
 	}
 
 	/** Assigns the argument to the variable. */
@@ -415,18 +494,22 @@ final class DataCompiler extends VisitorBase {
 		for (int i = 0; i < idents.size(); i++) {
 			final int identNumber = i;
 			// for each identifier, emit:
-			// var_i = (i < phraseResult.Length)
+			// var_i = (phraseResult != null && i < phraseResult.Length)
 			// ? phraseResult.Length[i] : ArdenNull.Instance;
 			idents.get(i).assign(context, new Switchable() {
 				@Override
 				public void apply(Switch sw) {
 					Label trueLabel = new Label();
+					Label falseLabel = new Label();
 					Label endLabel = new Label();
+					context.writer.loadVariable(phraseResultVar);
+					context.writer.jumpIfNull(falseLabel);
 					context.writer.loadIntegerConstant(identNumber);
 					context.writer.loadVariable(phraseResultVar);
 					context.writer.arrayLength();
 					context.writer.jumpIfLessThan(trueLabel);
 					// false part
+					context.writer.markForwardJumpsOnly(falseLabel);
 					new ANullExprFactorAtom().apply(sw);
 					context.writer.jump(endLabel);
 					// true part

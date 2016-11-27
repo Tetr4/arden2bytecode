@@ -28,6 +28,7 @@
 package arden.runtime;
 
 public final class ArdenDuration extends ArdenValue {
+	public static final ArdenDuration ZERO = new ArdenDuration(0, false, ArdenValue.NOPRIMARYTIME);
 	public static final double SECONDS_PER_MONTH = 2629746;
 
 	public final boolean isMonths;

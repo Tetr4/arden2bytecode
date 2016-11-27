@@ -72,12 +72,15 @@ public final class ScenarioCompiler extends VisitorBase {
 	private int engineVar;
 	private int loopIndexVar;
 	private int loopItemsVar;
+	private String institutionSelf;
 
-	public ScenarioCompiler(CompilerContext context, int mlmUnderTestVar, int contextVar, int engineVar) {
+	public ScenarioCompiler(CompilerContext context, String institutionSelf, int mlmUnderTestVar, int contextVar,
+			int engineVar) {
 		this.context = context;
 		this.contextVar = contextVar;
 		this.engineVar = engineVar;
 		this.mlmUnderTestVar = mlmUnderTestVar;
+		this.institutionSelf = institutionSelf;
 	}
 
 	// scenario slot
@@ -283,7 +286,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		// mlm_definition = {mlm} T.mlm? term
 		context.writer.loadVariable(contextVar);
 		context.writer.loadStringConstant(ParseHelpers.getMlmName(node.getTerm()));
-		context.writer.loadNull();
+		context.writer.loadStringConstant(institutionSelf);
 		context.writer.invokeInstance(ExecutionContextMethods.findModule);
 	}
 

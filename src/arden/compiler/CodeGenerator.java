@@ -76,6 +76,9 @@ final class CodeGenerator {
 	private boolean runWithAnnotationAdded = false;
 	private int scenarioNr = 0;
 	private FieldReference nowField;
+	private FieldReference eventTimeField;
+	private FieldReference triggerTimeField;
+	private FieldReference triggerField;
 
 	private static final String literalPrefix = "$literal";
 
@@ -198,8 +201,8 @@ final class CodeGenerator {
 	private MethodWriter parameterLessCtor;
 
 	public CompilerContext createConstructor(int lineNumberForInitializationSequencePoint) {
-		ctor = classFileWriter.createConstructor(Modifier.PUBLIC,
-				new Class<?>[] { ExecutionContext.class, MedicalLogicModule.class, ArdenValue[].class });
+		ctor = classFileWriter.createConstructor(Modifier.PUBLIC, new Class<?>[] { ExecutionContext.class,
+				MedicalLogicModule.class, ArdenValue[].class, Trigger.class });
 		this.lineNumberForInitializationSequencePoint = lineNumberForInitializationSequencePoint;
 		if (isDebuggingEnabled) {
 			ctor.enableLineNumberTable();
@@ -215,7 +218,7 @@ final class CodeGenerator {
 		}
 		ctor.jump(ctorInitCodeLabel);
 		ctor.mark(ctorUserCodeLabel);
-		return new CompilerContext(this, ctor, 3);
+		return new CompilerContext(this, ctor, 4);
 	}
 
 	public CompilerContext createParameterLessConstructor() {
@@ -228,7 +231,7 @@ final class CodeGenerator {
 		} catch (NoSuchMethodException e) {
 			throw new RuntimeException(e);
 		}
-		return new CompilerContext(this, ctor, 3);
+		return new CompilerContext(this, ctor, 0);
 	}
 
 	public CompilerContext createLogic() {
@@ -304,9 +307,8 @@ final class CodeGenerator {
 		return new CompilerContext(this, w, 0);
 	}
 
-	public CompilerContext createTrigger() {
-		MethodWriter w = classFileWriter.createMethod("getTrigger", Modifier.PUBLIC,
-				new Class<?>[] { ExecutionContext.class }, Trigger.class);
+	public CompilerContext createTriggers() {
+		MethodWriter w = classFileWriter.createMethod("getTriggers", Modifier.PUBLIC, new Class<?>[] { ExecutionContext.class }, Trigger[].class);
 		if (isDebuggingEnabled)
 			w.enableLineNumberTable();
 		return new CompilerContext(this, w, 1);
@@ -372,6 +374,27 @@ final class CodeGenerator {
 			nowField = classFileWriter.declareField("now", ArdenValue.class, Modifier.PRIVATE);
 		}
 		return nowField;
+	}
+
+	public FieldReference getEventTimeField() {
+		if (eventTimeField == null) {
+			eventTimeField = classFileWriter.declareField("eventtime", ArdenValue.class, Modifier.PRIVATE);
+		}
+		return eventTimeField;
+	}
+
+	public FieldReference getTriggerTimeField() {
+		if (triggerTimeField == null) {
+			triggerTimeField = classFileWriter.declareField("triggertime", ArdenValue.class, Modifier.PRIVATE);
+		}
+		return triggerTimeField;
+	}
+
+	public FieldReference getTriggerField() {
+		if (triggerField == null) {
+			triggerField = classFileWriter.declareField("$trigger", Trigger.class, Modifier.PRIVATE);
+		}
+		return triggerField;
 	}
 
 	public FieldReference createField(String name, Class<?> type, int modifiers) {
@@ -444,9 +467,26 @@ final class CodeGenerator {
 			ctor.markForwardJumpsOnly(ctorInitCodeLabel);
 			if (nowField != null) {
 				ctor.loadThis();
-				ctor.loadVariable(1);
+				ctor.loadVariable(1); // executionContextVariable
 				ctor.invokeInstance(ExecutionContextMethods.getCurrentTime);
 				ctor.storeInstanceField(nowField);
+			}
+			if (triggerField != null) {
+				ctor.loadThis();
+				ctor.loadVariable(4); // triggerVariable
+				ctor.storeInstanceField(triggerField);
+			}
+			if (eventTimeField != null) {
+				ctor.loadThis();
+				ctor.loadVariable(4); // triggerVariable
+				ctor.invokeStatic(Compiler.getRuntimeHelper("getEventTime", Trigger.class));
+				ctor.storeInstanceField(eventTimeField);
+			}
+			if (triggerTimeField != null) {
+				ctor.loadThis();
+				ctor.loadVariable(4); // triggerVariable
+				ctor.invokeStatic(Compiler.getRuntimeHelper("getTriggerTime", Trigger.class));
+				ctor.storeInstanceField(triggerTimeField);
 			}
 			for (FieldReference fieldToInit : fieldsNeedingInitialization) {
 				ctor.loadThis();
@@ -466,4 +506,5 @@ final class CodeGenerator {
 		}
 		classFileWriter.save(output);
 	}
+
 }

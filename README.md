@@ -49,22 +49,14 @@ To run the test suites you can use Eclipse or Ant:
 
 
 ## Standard Conformance
-Daniel:  
-I believe this compiler fully implements Arden Syntax 2.5 with the following exceptions:
+This compiler implements Arden Syntax 2.5 with the following exceptions:
 
 Languages features not implemented:
 
-* From Arden Syntax 2.1 specification:
-    * 10.2.4.6 Event Call
-    * 11.2.2 Event Statement
-    * 13 Evoke Slot
-* From Arden Syntax 2.5 specification:
-    * 11.2.5.2 Message As statement
-    * 11.2.5.6 Destination As statement
-    * Some string formatting specificiers are not implemented.
-    * There is no way to use Arden variables within mapping clauses.
-    * Citation/links slots are not syntax checked.
-    * The compiler does not check that no languages features newer than the specified 'Arden Version' are used.
+* Include Statement
+* Some string formatting specificiers are not implemented.
+* Citation/links slots are not syntax checked.
+* The compiler does not check that no languages features newer than the specified 'Arden Version' are used.
 
 
 ## Copyright and license

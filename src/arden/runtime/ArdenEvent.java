@@ -1,12 +1,9 @@
 package arden.runtime;
 
-/**
- * Represents an <code>EVENT</code> object. Subclasses can customize the default
- * behavior, e.g. by overriding {@link #equals(Object)}.
- */
-public class ArdenEvent extends ArdenValue {
+/** Represents an <code>EVENT</code> object. */
+public final class ArdenEvent extends ArdenValue {
 	public final String name;
-	public boolean isEvokingEvent = false;
+	public final boolean isEvokingEvent;
 	/**
 	 * The <code>TIME OF an_event</code> (the primary time) is the clinically
 	 * relevant time, e.g. the time when a sample was taken. <br>
@@ -21,19 +18,29 @@ public class ArdenEvent extends ArdenValue {
 	public ArdenEvent(String name) {
 		super();
 		this.name = name;
-		this.eventTime = super.primaryTime;
+		this.eventTime = NOPRIMARYTIME;
+		this.isEvokingEvent = false;
 	}
 
 	public ArdenEvent(String name, long primaryTime) {
 		super(primaryTime);
 		this.name = name;
 		this.eventTime = primaryTime;
+		this.isEvokingEvent = false;
 	}
 
 	public ArdenEvent(String name, long primaryTime, long eventTime) {
 		super(primaryTime);
 		this.name = name;
 		this.eventTime = eventTime;
+		this.isEvokingEvent = false;
+	}
+
+	private ArdenEvent(String name, long primaryTime, long eventTime, boolean isEvokingEvent) {
+		super(primaryTime);
+		this.name = name;
+		this.eventTime = eventTime;
+		this.isEvokingEvent = true;
 	}
 
 	@Override
@@ -46,8 +53,8 @@ public class ArdenEvent extends ArdenValue {
 		return new ArdenEvent(name, newPrimaryTime);
 	}
 
-	public void setEvokingEvent(boolean isEvokingEvent) {
-		this.isEvokingEvent = isEvokingEvent;
+	public ArdenEvent setEvokingEvent(boolean isEvokingEvent) {
+		return new ArdenEvent(name, primaryTime, eventTime, isEvokingEvent);
 	}
 
 	@Override

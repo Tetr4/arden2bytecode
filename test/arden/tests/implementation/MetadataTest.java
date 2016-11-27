@@ -33,6 +33,9 @@ import org.junit.Test;
 import arden.runtime.ExecutionContext;
 import arden.runtime.LibraryMetadata;
 import arden.runtime.MaintenanceMetadata;
+import arden.runtime.MaintenanceMetadata.ArdenVersion;
+import arden.runtime.MaintenanceMetadata.Validation;
+import arden.runtime.evoke.CallTrigger;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.MedicalLogicModuleImplementation;
 
@@ -44,12 +47,12 @@ public class MetadataTest extends ImplementationTest {
 		MaintenanceMetadata m = mlm.getMaintenance();
 		Assert.assertEquals("Fractional excretion of sodium", m.getTitle());
 		Assert.assertEquals("fractional_na", mlm.getName());
-		Assert.assertEquals("2", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V2, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.(hripcsak@cucis.cis.columbia.edu)", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		Assert.assertEquals(3, mlm.getLibrary().getKeywords().size());
 		Assert.assertEquals("fractional excretion", mlm.getLibrary().getKeywords().get(0));
@@ -66,12 +69,12 @@ public class MetadataTest extends ImplementationTest {
 		MaintenanceMetadata m = mlm.getMaintenance();
 		Assert.assertEquals("Check for penicillin allergy", m.getTitle());
 		Assert.assertEquals("pen_allergy", mlm.getName());
-		Assert.assertEquals("1", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V1, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		Assert.assertEquals(2, mlm.getLibrary().getKeywords().size());
 		Assert.assertEquals("penicillin", mlm.getLibrary().getKeywords().get(0));
@@ -86,17 +89,17 @@ public class MetadataTest extends ImplementationTest {
 		
 		ExecutionContext cx = new TestContext();
 		
-		MedicalLogicModuleImplementation impl = mlm.createInstance(cx, null);
+		MedicalLogicModuleImplementation impl = mlm.createInstance(cx, null, new CallTrigger());
 
 		MaintenanceMetadata m = impl.getMaintenanceMetadata();
 		Assert.assertEquals("Fractional excretion of sodium", m.getTitle());
 		Assert.assertEquals("fractional_na", m.getMlmName());
-		Assert.assertEquals("2", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V2, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.(hripcsak@cucis.cis.columbia.edu)", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		LibraryMetadata l = impl.getLibraryMetadata();
 		Assert.assertEquals(3, l.getKeywords().size());
@@ -111,17 +114,17 @@ public class MetadataTest extends ImplementationTest {
 
 		ExecutionContext cx = new TestContext();
 		
-		MedicalLogicModuleImplementation impl = mlm.createInstance(cx, null);
+		MedicalLogicModuleImplementation impl = mlm.createInstance(cx, null, new CallTrigger());
 		
 		MaintenanceMetadata m = impl.getMaintenanceMetadata();
 		Assert.assertEquals("Check for penicillin allergy", m.getTitle());
 		Assert.assertEquals("pen_allergy", m.getMlmName());
-		Assert.assertEquals("1", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V1, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		LibraryMetadata l = impl.getLibraryMetadata();
 		Assert.assertEquals(2, l.getKeywords().size());

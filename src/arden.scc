@@ -435,7 +435,7 @@ Tokens
   years       = y e a r s;
 
   ct           = 'T';
-  {arden}version_number  = digit ('.' digit)?;
+  {arden}version_number  = digit ('.' digit digit?)?;
 
   {normal}identifier = letter (letter | digit | us)*;
   /* up to 80 characters total (no reserved words allowed) */

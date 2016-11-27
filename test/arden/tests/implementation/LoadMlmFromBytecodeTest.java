@@ -16,7 +16,11 @@ import arden.runtime.ArdenValue;
 import arden.runtime.DatabaseQuery;
 import arden.runtime.LibraryMetadata;
 import arden.runtime.MaintenanceMetadata;
+import arden.runtime.MaintenanceMetadata.ArdenVersion;
+import arden.runtime.MaintenanceMetadata.Validation;
+import arden.runtime.evoke.CallTrigger;
 import arden.runtime.MedicalLogicModule;
+import arden.runtime.MedicalLogicModuleImplementation;
 import arden.runtime.MemoryQuery;
 import arden.runtime.RuntimeHelpers;
 
@@ -39,7 +43,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.1.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -49,7 +53,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.2.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -58,7 +62,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 	public void x33noAllergies() throws Exception {
 		MedicalLogicModule mlm = compile("x3.3.mlm");
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("", context.getOutputText());
 	}
 
@@ -73,7 +77,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 				return new MemoryQuery(new ArdenValue[] { list });
 			}
 		};
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("Caution, the patient has the following allergy to penicillin documented: all2\n", context
 				.getOutputText());
 	}
@@ -89,14 +93,15 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 				return new MemoryQuery(new ArdenValue[] { list });
 			}
 		};
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("", context.getOutputText());
 	}
 
 	@Test
 	public void x33urgency() throws Exception {
 		MedicalLogicModule mlm = compileBytecode("x3.3.mlm");
-		Assert.assertEquals(51.0, mlm.createInstance(new TestContext(), null).getUrgency(), 0);
+		MedicalLogicModuleImplementation instance = mlm.createInstance(new TestContext(), null, new CallTrigger());
+		Assert.assertEquals(51.0, instance.getUrgency(), 0);
 	}
 
 	@Test
@@ -104,7 +109,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.4.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -114,7 +119,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.5.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals(
 				"Suggest obtaining a serum creatinine to follow up on renal function in the setting of gentamicin.\n",
@@ -126,7 +131,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.6.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -136,7 +141,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MedicalLogicModule mlm = compileBytecode("x3.7.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -155,7 +160,7 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		ArdenList patientReactions = new ArdenList(new ArdenValue[] { new ArdenString("r1"), new ArdenString("r2"),
 				new ArdenString("r3") });
 		ArdenValue[] result = mlm.run(context, new ArdenValue[] { medOrders, medAllergens, patientAllergies,
-				patientReactions });
+				patientReactions }, new CallTrigger());
 		Assert.assertEquals(3, result.length);
 
 		Assert.assertEquals("(\"order1\",\"order2\")", result[0].toString());
@@ -172,12 +177,12 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MaintenanceMetadata m = compiledMlm.getMaintenance();
 		Assert.assertEquals("Fractional excretion of sodium", m.getTitle());
 		Assert.assertEquals("fractional_na", m.getMlmName());
-		Assert.assertEquals("2", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V2, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.(hripcsak@cucis.cis.columbia.edu)", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		LibraryMetadata l = compiledMlm.getLibrary();
 		Assert.assertEquals(3, l.getKeywords().size());
@@ -197,12 +202,12 @@ public class LoadMlmFromBytecodeTest extends ImplementationTest {
 		MaintenanceMetadata m = compiledMlm.getMaintenance();
 		Assert.assertEquals("Check for penicillin allergy", m.getTitle());
 		Assert.assertEquals("pen_allergy", m.getMlmName());
-		Assert.assertEquals("1", m.getArdenVersion());
+		Assert.assertEquals(ArdenVersion.V1, m.getArdenVersion());
 		Assert.assertEquals("1.00", m.getVersion());
 		Assert.assertEquals("Columbia-Presbyterian Medical Center", m.getInstitution());
 		Assert.assertEquals("George Hripcsak, M.D.", m.getAuthor());
 		Assert.assertNull(m.getSpecialist());
-		Assert.assertEquals("testing", m.getValidation());
+		Assert.assertEquals(Validation.TESTING, m.getValidation());
 
 		LibraryMetadata l = compiledMlm.getLibrary();
 		Assert.assertEquals(2, l.getKeywords().size());

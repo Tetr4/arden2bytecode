@@ -980,15 +980,15 @@ class ExpressionCompiler extends VisitorBase {
 	@Override
 	public void caseAEtimTimeValue(AEtimTimeValue node) {
 		// time_value = {etim} eventtime
-		context.writer.loadVariable(context.executionContextVariable);
-		context.writer.invokeInstance(ExecutionContextMethods.getEventTime);
+		context.writer.loadThis();
+		context.writer.loadInstanceField(context.codeGenerator.getEventTimeField());
 	}
 
 	@Override
 	public void caseATtimTimeValue(ATtimTimeValue node) {
 		// time_value = {ttim} triggertime
-		context.writer.loadVariable(context.executionContextVariable);
-		context.writer.invokeInstance(ExecutionContextMethods.getTriggerTime);
+		context.writer.loadThis();
+		context.writer.loadInstanceField(context.codeGenerator.getTriggerTimeField());
 	}
 
 	@Override

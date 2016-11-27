@@ -433,7 +433,7 @@ public class LogicSlotTest extends SpecificationTest {
 		assertReturns(multiParams, "(1,2,NULL)");
 
 		String listParam = new ArdenCodeBuilder(data)
-				.addLogic("(a, b) := CALL other_mlm WITH (1,2,3), 2;")
+				.addLogic("(a, b) := CALL other_mlm WITH 2, (1,2,3);")
 				.addLogic("CONCLUDE TRUE;")
 				.addAction("RETURN a*b;")
 				.toString();

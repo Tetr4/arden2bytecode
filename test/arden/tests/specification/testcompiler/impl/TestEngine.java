@@ -1,25 +1,25 @@
 package arden.tests.specification.testcompiler.impl;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Queue;
-import java.util.TreeMap;
 
-import arden.compiler.CompiledMlm;
+import arden.engine.Call;
+import arden.engine.EventCall;
+import arden.engine.MlmCall;
+import arden.engine.Schedule;
 import arden.runtime.ArdenDuration;
 import arden.runtime.ArdenEvent;
 import arden.runtime.ArdenRunnable;
 import arden.runtime.ArdenString;
 import arden.runtime.ArdenTime;
 import arden.runtime.ArdenValue;
-import arden.runtime.ExecutionContext;
+import arden.runtime.ExecutionContextHelpers;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.evoke.Trigger;
+import arden.tests.specification.testcompiler.TestCompiler;
 import arden.tests.specification.testcompiler.TestCompilerDelayedMessage;
 
 /**
@@ -29,56 +29,41 @@ import arden.tests.specification.testcompiler.TestCompilerDelayedMessage;
  * tests don't block.
  */
 public class TestEngine extends TestContext {
-	private static Comparator<MlmCall> priorityComparator = new Comparator<MlmCall>() {
-		@Override
-		public int compare(MlmCall m1, MlmCall m2) {
-			// highest priority first
-			return (int) (m2.getPriority() - m1.getPriority());
-		}
-	};
-	private List<MedicalLogicModule> mlms = new ArrayList<>();
-	private Schedule scheduledCalls = new Schedule();
-	private Queue<TestCompilerDelayedMessage> messages = new LinkedList<>();
-	private ArdenTime startTime;
+	private final List<MedicalLogicModule> mlms;
+	private final Schedule scheduledCalls;
+	private final Queue<TestCompilerDelayedMessage> messages = new LinkedList<>();
+	private final ArdenTime startTime;
 	private ArdenTime currentTime;
 
-	public TestEngine(List<CompiledMlm> mlms, String institutionSelf) {
-		super(mlms, institutionSelf);
-		this.mlms.addAll(mlms);
-	}
-
-	public void callEvent(ArdenEvent event) {
-		this.startTime = new ArdenTime(event.eventTime);
+	public TestEngine(List<MedicalLogicModule> mlms, ArdenTime startTime) {
+		super(mlms);
+		this.mlms = mlms;
+		this.startTime = startTime;
 		currentTime = startTime;
-
-		// check if MLMs are directly triggered
-		for (MedicalLogicModule mlm : mlms) {
-			Trigger trigger;
-			try {
-				trigger = mlm.getTrigger(this, null);
-			} catch (InvocationTargetException e) {
-				throw new RuntimeException(e);
-			}
-			trigger.scheduleEvent(event);
-			if (trigger.runOnEvent(event)) {
-				scheduledCalls.add(currentTime, new MlmCall(mlm, this, null));
-			}
-		}
-
-		// schedule MLMs which may now be triggered
-		Schedule additionalSchedule = createSchedule(mlms);
-		scheduledCalls.add(additionalSchedule);
+		scheduledCalls = Schedule.create(this, mlms);
 	}
 
 	@Override
-	public void callWithDelay(ArdenRunnable mlm, ArdenValue[] arguments, ArdenValue delayValue) {
+	public void call(ArdenRunnable mlm, ArdenValue[] arguments, ArdenValue delayValue, Trigger trigger,
+			double urgency) {
 		ArdenDuration delayDuration = (ArdenDuration) delayValue;
 		ArdenTime nextRuntime = new ArdenTime(currentTime.add(delayDuration));
-		scheduledCalls.add(nextRuntime, new MlmCall((MedicalLogicModule) mlm, this, arguments));
+		Trigger calleeTrigger = ExecutionContextHelpers.combine(trigger,
+				ExecutionContextHelpers.delayToMillis(delayValue));
+		scheduledCalls.add(nextRuntime, new MlmCall(this, mlm, arguments, calleeTrigger, (int) urgency));
 	}
 
 	@Override
-	public void write(ArdenValue message, String destination) {
+	public void call(ArdenEvent event, ArdenValue delayValue, double urgency) {
+		ArdenDuration delayDuration = (ArdenDuration) delayValue;
+		ArdenTime nextRuntime = new ArdenTime(currentTime.add(delayDuration));
+		ArdenEvent eventAfterDelay = ExecutionContextHelpers.combine(event,
+				ExecutionContextHelpers.delayToMillis(delayValue));
+		scheduledCalls.add(nextRuntime, new EventCall(this, mlms, eventAfterDelay, (int) urgency));
+	}
+
+	@Override
+	public void write(ArdenValue message, ArdenValue destination, double urgency) {
 		// save messages
 		String stringMessage;
 		if (message instanceof ArdenString) {
@@ -98,26 +83,27 @@ public class TestEngine extends TestContext {
 	public TestCompilerDelayedMessage getNextDelayedMessage() throws InvocationTargetException {
 		while (messages.isEmpty()) {
 			// get the next MLM
-			Entry<ArdenTime, Queue<MlmCall>> nextEntry = scheduledCalls.firstEntry();
+			Entry<ArdenTime, Queue<Call>> nextEntry = scheduledCalls.firstEntry();
 			if (nextEntry == null) {
 				throw new IllegalStateException("There are no more messages");
 			}
 			ArdenTime nextRunTime = nextEntry.getKey();
-			Queue<MlmCall> queueCalls = nextEntry.getValue();
-			MlmCall nextMlm = queueCalls.poll(); // highest priority
+			Queue<Call> queueCalls = nextEntry.getValue();
+			Call nextCall = queueCalls.poll(); // highest priority
 			if (queueCalls.isEmpty()) {
 				// remove empty list
 				scheduledCalls.pollFirstEntry();
 			}
 
 			// run the next MLM
-			if (nextRunTime.value >= currentTime.value) {
-				currentTime = new ArdenTime(nextRunTime.value+1); // skip delay
+			if (nextRunTime.value > currentTime.value) {
+				// skip delay
+				currentTime = new ArdenTime(nextRunTime.value);
 			}
-			nextMlm.run();
+			nextCall.run();
 
 			// schedule MLMs which may now be triggered
-			Schedule additionalSchedule = createSchedule(mlms);
+			Schedule additionalSchedule = Schedule.create(this, mlms);
 			scheduledCalls.add(additionalSchedule);
 		}
 
@@ -125,94 +111,13 @@ public class TestEngine extends TestContext {
 	}
 
 	@Override
+	public ArdenEvent getEvent(String mapping) {
+		return new ArdenEvent(mapping, getCurrentTime().value);
+	}
+
+	@Override
 	public ArdenTime getCurrentTime() {
 		return currentTime;
-	}
-
-	private Schedule createSchedule(List<MedicalLogicModule> mlms) {
-		Schedule schedule = new Schedule();
-
-		// put MLMs which should run at the same time into groups sorted by time
-		for (MedicalLogicModule mlm : mlms) {
-			Trigger trigger;
-			try {
-				trigger = mlm.getTrigger(this, null);
-			} catch (InvocationTargetException e) {
-				// print error and skip this MLM
-				e.printStackTrace();
-				continue;
-			}
-
-			ArdenTime nextRuntime = trigger.getNextRunTime(this);
-			if (nextRuntime == null) {
-				// not scheduled
-				continue;
-			}
-
-			schedule.add(nextRuntime, new MlmCall(mlm, this, null));
-		}
-
-		return schedule;
-	}
-
-	@SuppressWarnings("serial")
-	private static class Schedule extends TreeMap<ArdenTime, Queue<MlmCall>> {
-		public Schedule() {
-			// sort by time
-			super(new ArdenTime.NaturalComparator());
-		}
-
-		public void add(Schedule additionalSchedule) {
-			for (Entry<ArdenTime, Queue<MlmCall>> entry : additionalSchedule.entrySet()) {
-				ArdenTime time = entry.getKey();
-				Queue<MlmCall> scheduleGroup = get(time);
-				if (scheduleGroup == null) {
-					put(time, entry.getValue());
-				} else {
-					scheduleGroup.addAll(entry.getValue());
-				}
-			}
-		}
-
-		public void add(ArdenTime nextRunTime, MlmCall mlm) {
-			Queue<MlmCall> scheduleGroup = get(nextRunTime);
-			if (scheduleGroup == null) {
-				scheduleGroup = new PriorityQueue<MlmCall>(3, priorityComparator);
-				put(nextRunTime, scheduleGroup);
-			}
-			scheduleGroup.add(mlm);
-		}
-	}
-
-	private static class MlmCall implements Runnable {
-		final MedicalLogicModule mlm;
-		final ArdenValue[] args;
-		final int priority;
-		final ExecutionContext context;
-
-		public MlmCall(MedicalLogicModule mlm, ExecutionContext context, ArdenValue[] args, int priority) {
-			this.mlm = mlm;
-			this.args = args;
-			this.priority = priority;
-			this.context = context;
-		}
-
-		public MlmCall(MedicalLogicModule mlm, ExecutionContext context, ArdenValue[] args) {
-			this(mlm, context, args, (int) Math.round(mlm.getPriority()));
-		}
-
-		public int getPriority() {
-			return priority;
-		}
-
-		@Override
-		public void run() {
-			try {
-				mlm.run(context, args);
-			} catch (InvocationTargetException e) {
-				throw new RuntimeException(e);
-			}
-		}
 	}
 
 }

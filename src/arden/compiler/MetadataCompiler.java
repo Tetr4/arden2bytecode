@@ -56,6 +56,8 @@ import arden.compiler.node.AVrsnArdenVersionSlot;
 import arden.compiler.node.TNumberLiteral;
 import arden.runtime.LibraryMetadata;
 import arden.runtime.MaintenanceMetadata;
+import arden.runtime.MaintenanceMetadata.ArdenVersion;
+import arden.runtime.MaintenanceMetadata.Validation;
 import arden.runtime.RuntimeHelpers;
 
 /**
@@ -112,13 +114,19 @@ final class MetadataCompiler extends DepthFirstAdapter {
 	@Override
 	public void caseAVrsnArdenVersionSlot(AVrsnArdenVersionSlot node) {
 		if (usedFileNameForMlmName)
-			throw new RuntimeCompilerException("Cannot use 'filename' with Arden version 2");
-		maintenance.setArdenVersion(node.getVersionNumber().getText());
+			throw new RuntimeCompilerException("Cannot use 'filename' with Arden version >= 2");
+		String versionNumber = node.getVersionNumber().getText().toLowerCase();
+		String enumVersionNumber = "V" + versionNumber.replace(".", "_");
+		ArdenVersion version = ArdenVersion.valueOf(enumVersionNumber);
+		if (version == ArdenVersion.V1) {
+			throw new RuntimeCompilerException(node.getVersion(), "Arden version 1 does not allow the 'arden' slot");
+		}
+		maintenance.setArdenVersion(version);
 	}
 
 	@Override
 	public void caseAEmptyArdenVersionSlot(AEmptyArdenVersionSlot node) {
-		maintenance.setArdenVersion("1");
+		maintenance.setArdenVersion(ArdenVersion.V1);
 	}
 
 	// version_slot = version colon text semicolons;
@@ -182,22 +190,22 @@ final class MetadataCompiler extends DepthFirstAdapter {
 	// | {exp} expired;
 	@Override
 	public void caseAProdValidationCode(AProdValidationCode node) {
-		maintenance.setValidation("production");
+		maintenance.setValidation(Validation.PRODUCTION);
 	}
 
 	@Override
 	public void caseAResValidationCode(AResValidationCode node) {
-		maintenance.setValidation("research");
+		maintenance.setValidation(Validation.RESEARCH);
 	}
 
 	@Override
 	public void caseATestValidationCode(ATestValidationCode node) {
-		maintenance.setValidation("testing");
+		maintenance.setValidation(Validation.TESTING);
 	}
 
 	@Override
 	public void caseAExpValidationCode(AExpValidationCode node) {
-		maintenance.setValidation("expired");
+		maintenance.setValidation(Validation.EXPIRED);
 	}
 
 	// Library Category

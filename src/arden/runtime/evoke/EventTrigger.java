@@ -2,11 +2,9 @@ package arden.runtime.evoke;
 
 import arden.runtime.ArdenEvent;
 import arden.runtime.ArdenTime;
-import arden.runtime.ExecutionContext;
 
-public class EventTrigger implements Trigger {
-
-	private ArdenEvent event;
+public final class EventTrigger implements Trigger {
+	private final ArdenEvent event;
 	private ArdenEvent triggeringEvent = null;
 
 	public EventTrigger(ArdenEvent event) {
@@ -17,7 +15,7 @@ public class EventTrigger implements Trigger {
 	}
 
 	@Override
-	public ArdenTime getNextRunTime(ExecutionContext context) {
+	public ArdenTime getNextRunTime() {
 		return null;
 	}
 
@@ -41,5 +39,4 @@ public class EventTrigger implements Trigger {
 	public long getDelay() {
 		return 0;
 	}
-
 }

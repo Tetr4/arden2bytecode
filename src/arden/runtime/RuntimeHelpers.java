@@ -30,9 +30,15 @@ package arden.runtime;
 import java.lang.reflect.InvocationTargetException;
 import java.text.DateFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
+
+import arden.runtime.evoke.CallTrigger;
+import arden.runtime.evoke.Trigger;
 
 
 /**
@@ -49,23 +55,45 @@ public final class RuntimeHelpers {
 		}
 	}
 
-	public static ArdenValue[] call(ArdenRunnable mlm, ExecutionContext context, ArdenValue[] arguments) {
+	public static ArdenValue[] call(ArdenRunnable mlm, ExecutionContext context, ArdenValue[] arguments, Trigger trigger) {
 		try {
-			return mlm.run(context, arguments);
+			return mlm.run(context, arguments, trigger);
 		} catch (InvocationTargetException e) {
 			throw new RuntimeException(e);
 		}
 	}
-	
+
+	public static ArdenValue[] callEvent(ArdenEvent event, ExecutionContext context, ArdenValue[] arguments) {
+		List<ArdenValue> returnValues = new ArrayList<>();
+		for (ArdenRunnable mlm : context.findModules(event)) {
+			try {
+				ArdenValue[] values = mlm.run(context, arguments, new CallTrigger(event, 0));
+				// ignore single NULL
+				if (!(values.length == 1 && values[0] instanceof ArdenNull)) {
+					Collections.addAll(returnValues, values);
+				}
+			} catch (InvocationTargetException e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		// list is returned
+		ArdenValue[] values = returnValues.toArray(new ArdenValue[returnValues.size()]);
+		return new ArdenValue[] { new ArdenList(values) };
+	}
+
 	public static final double DEFAULT_URGENCY = 50;
 	
 	public static final double DEFAULT_PRIORITY = 50; 
 
 	public static double urgencyGetPrimitiveValue(ArdenValue val) {
-		if (val instanceof ArdenNumber)
-			return ((ArdenNumber) val).value;
-		else
-			return DEFAULT_URGENCY;
+		if (val instanceof ArdenNumber) {
+			double urgency = ((ArdenNumber) val).value;
+			if (urgency >= 1 && urgency <= 99) {
+				return urgency;
+			}
+		}
+		return DEFAULT_URGENCY;
 	}
 
 	/** Converts val to int. Returns -1 if val is not an integer. */
@@ -319,5 +347,45 @@ public final class RuntimeHelpers {
 				setObjectMember(listEntry, upperCaseFieldName, newValue);
 			}
 		}
+	}
+
+	public static ArdenValue getEventTime(Trigger trigger) {
+		ArdenEvent triggeringEvent = trigger.getTriggeringEvent();
+		if (triggeringEvent != null) {
+			long eventTime = triggeringEvent.eventTime;
+			if (eventTime != ArdenValue.NOPRIMARYTIME) {
+				return new ArdenTime(eventTime);
+			}
+		}
+		return ArdenNull.INSTANCE;
+	}
+
+	public static ArdenValue getTriggerTime(Trigger trigger) {
+		ArdenEvent triggeringEvent = trigger.getTriggeringEvent();
+		if (triggeringEvent != null) {
+			long eventTime = triggeringEvent.eventTime;
+			if (eventTime != ArdenValue.NOPRIMARYTIME) {
+				return new ArdenTime(eventTime + trigger.getDelay());
+			}
+		}
+		return ArdenNull.INSTANCE;
+	}
+
+	public static ArdenEvent prepareForCall(ArdenEvent event, ArdenValue now, ArdenValue triggertime) {
+		if (triggertime instanceof ArdenTime) {
+			return (ArdenEvent) event.setTime(((ArdenTime) triggertime).value);
+		} else if (now instanceof ArdenTime) {
+			return (ArdenEvent) event.setTime(((ArdenTime) now).value);
+		} else {
+			return (ArdenEvent) event.setTime(ArdenValue.NOPRIMARYTIME);
+		}
+	}
+
+	public static ArdenEvent flagEvokingEvent(ArdenEvent event, Trigger trigger) {
+		ArdenEvent triggeringEvent = trigger.getTriggeringEvent();
+		if (triggeringEvent != null && event.equals(triggeringEvent)) {
+			return triggeringEvent.setEvokingEvent(true);
+		}
+		return event;
 	}
 }

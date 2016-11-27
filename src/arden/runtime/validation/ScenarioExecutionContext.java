@@ -3,6 +3,7 @@ package arden.runtime.validation;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,8 @@ import org.junit.Assert;
 
 import arden.runtime.ArdenDuration;
 import arden.runtime.ArdenEvent;
+import arden.runtime.ArdenNull;
+import arden.runtime.ArdenObject;
 import arden.runtime.ArdenRunnable;
 import arden.runtime.ArdenString;
 import arden.runtime.ArdenTime;
@@ -20,21 +23,25 @@ import arden.runtime.DatabaseQuery;
 import arden.runtime.ExecutionContext;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.MemoryQuery;
+import arden.runtime.ObjectType;
+import arden.runtime.evoke.Trigger;
 
 public class ScenarioExecutionContext extends BaseExecutionContext {
 	// configuration
 	Map<String, ArdenValue[]> queries = new HashMap<>();
 	Map<String, ArdenValue[]> interfaces = new HashMap<>();
+	ArdenTime currentTime;
+	{
+		Calendar calendar = Calendar.getInstance();
+		calendar.clear();
+		calendar.set(1900, 0, 0, 0, 0, 0);
+		currentTime = new ArdenTime(calendar.getTimeInMillis());
+	}
 
 	// captured output
 	List<WrittenMessage> writtenMessages = new ArrayList<>();
 	List<MlmCall> mlmCalls = new ArrayList<>();
 	List<EventCall> eventCalls = new ArrayList<>();
-
-	// event
-	ArdenTime currentTime = null;
-	ArdenTime triggerTime = null;
-	ArdenEvent evokingEvent;
 
 	public ScenarioExecutionContext() {
 		super(((URLClassLoader) (Thread.currentThread().getContextClassLoader())).getURLs());
@@ -52,17 +59,10 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 		interfaces.put(mapping, values);
 	}
 
-	public void setEvokingEvent(ArdenEvent event, long delay) {
-		event.isEvokingEvent = true;
-		triggerTime = new ArdenTime(event.eventTime + delay);
-		this.evokingEvent = event;
-	}
-
 	public void resetCapturedOutput() {
 		writtenMessages.clear();
 		mlmCalls.clear();
 		eventCalls.clear();
-		evokingEvent = null;
 	}
 
 	public MlmCall[] getMlmCalls(MedicalLogicModule mlm) {
@@ -74,7 +74,7 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 		}
 		return calls.toArray(new MlmCall[calls.size()]);
 	}
-	
+
 	public EventCall[] getEventCalls(String mapping) {
 		List<EventCall> calls = new ArrayList<>();
 		for (EventCall call : eventCalls) {
@@ -106,7 +106,7 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 			Assert.assertTrue("Message(s) have been written", messages.length == 0);
 		}
 	}
-	
+
 	// TODO method to remove checked messages?
 
 	public ArdenValue[] getWrittenMessages(String destination) {
@@ -120,7 +120,7 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 		}
 		return values.toArray(new ArdenValue[values.size()]);
 	}
-	
+
 	@Override
 	public DatabaseQuery createQuery(String mapping) {
 		ArdenValue[] values = queries.get(mapping);
@@ -136,52 +136,67 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 	}
 
 	@Override
-	public ArdenEvent getEvent(String mapping) {
-		if (evokingEvent != null && evokingEvent.name.equalsIgnoreCase(mapping)) {
-			return evokingEvent;
-		}
-		return super.getEvent(mapping);
+	public ArdenObject getMessageAs(String mapping, ObjectType type) {
+		// store mapping in typeinfo
+		ObjectType mappingType = new ObjectType(mapping, new String[] {});
+		return new ArdenObject(mappingType);
 	}
 
 	@Override
-	public void write(ArdenValue message, String destination) {
-		writtenMessages.add(new WrittenMessage(message, destination));
+	public ArdenValue getDestination(String mapping) {
+		return new ArdenString(mapping);
+	}
+
+	@Override
+	public ArdenObject getDestinationAs(String mapping, ObjectType type) {
+		// store mapping in typeinfo
+		ObjectType mappingType = new ObjectType(mapping, new String[] {});
+		return new ArdenObject(mappingType);
+	}
+
+	@Override
+	public ArdenEvent getEvent(String mapping) {
+		return new ArdenEvent(mapping, currentTime.value);
+	}
+
+	@Override
+	public void write(ArdenValue message, ArdenValue destination, double urgency) {
+		if (message instanceof ArdenObject) {
+			// recover mapping from type
+			message = new ArdenString(((ArdenObject) message).type.name);
+		}
+		if (destination instanceof ArdenObject) {
+			// recover mapping from type
+			destination = new ArdenString(((ArdenObject) destination).type.name);
+		}
+		String destinationString = ArdenString.getStringFromValue(destination);
+		writtenMessages.add(new WrittenMessage(message, destinationString));
 	}
 
 	@Override
 	public ArdenRunnable findInterface(final String mapping) {
 		final ArdenValue[] values = interfaces.get(mapping);
-		if (values == null) {
-			throw new AssertionError("The result for the {" + mapping + "} interface is not defined.");
-		}
-		
 		return new ArdenRunnable() {
 			@Override
-			public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments) throws InvocationTargetException {
+			public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments, Trigger trigger)
+					throws InvocationTargetException {
+				if (values == null) {
+					System.err.println("Warning: the result for the {" + mapping + "} interface is not defined.");
+					return new ArdenValue[] { ArdenNull.INSTANCE };
+				}
 				return values;
 			}
 		};
 	}
 
 	@Override
-	public void callWithDelay(ArdenRunnable mlm, ArdenValue[] arguments, ArdenValue delay) {
+	public void call(ArdenRunnable mlm, ArdenValue[] arguments, ArdenValue delay, Trigger trigger, double urgency) {
 		mlmCalls.add(new MlmCall((MedicalLogicModule) mlm, arguments, (ArdenDuration) delay));
 	}
 
 	@Override
-	public void callEvent(ArdenEvent event) {
-		// TODO events can be called with delay
-		eventCalls.add(new EventCall(event.name, null));
-	}
-
-	@Override
-	public ArdenTime getEventTime() {
-		return new ArdenTime(evokingEvent.eventTime);
-	}
-
-	@Override
-	public ArdenTime getTriggerTime() {
-		return triggerTime;
+	public void call(ArdenEvent event, ArdenValue delay, double urgency) {
+		eventCalls.add(new EventCall(event.name, delay));
 	}
 
 	@Override

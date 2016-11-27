@@ -36,7 +36,9 @@ import arden.runtime.ArdenString;
 import arden.runtime.ArdenValue;
 import arden.runtime.DatabaseQuery;
 import arden.runtime.MedicalLogicModule;
+import arden.runtime.MedicalLogicModuleImplementation;
 import arden.runtime.MemoryQuery;
+import arden.runtime.evoke.CallTrigger;
 
 public class ExampleTest extends ImplementationTest {
 	
@@ -45,7 +47,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.1.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -55,7 +57,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.2.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -64,7 +66,7 @@ public class ExampleTest extends ImplementationTest {
 	public void x33noAllergies() throws Exception {
 		MedicalLogicModule mlm = compile("x3.3.mlm");
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("", context.getOutputText());
 	}
 
@@ -79,7 +81,7 @@ public class ExampleTest extends ImplementationTest {
 				return new MemoryQuery(new ArdenValue[] { list });
 			}
 		};
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("Caution, the patient has the following allergy to penicillin documented: all2\n", context
 				.getOutputText());
 	}
@@ -95,14 +97,15 @@ public class ExampleTest extends ImplementationTest {
 				return new MemoryQuery(new ArdenValue[] { list });
 			}
 		};
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 		Assert.assertEquals("", context.getOutputText());
 	}
 
 	@Test
 	public void x33urgency() throws Exception {
 		MedicalLogicModule mlm = compile("x3.3.mlm");
-		Assert.assertEquals(51.0, mlm.createInstance(new TestContext(), null).getUrgency(), 0);
+		MedicalLogicModuleImplementation instance = mlm.createInstance(new TestContext(), null, new CallTrigger());
+		Assert.assertEquals(51.0, instance.getUrgency(), 0);
 	}
 
 	@Test
@@ -110,7 +113,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.4.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -120,7 +123,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.5.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals(
 				"Suggest obtaining a serum creatinine to follow up on renal function in the setting of gentamicin.\n",
@@ -132,7 +135,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.6.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -142,7 +145,7 @@ public class ExampleTest extends ImplementationTest {
 		MedicalLogicModule mlm = compile("x3.7.mlm");
 
 		TestContext context = new TestContext();
-		mlm.run(context, null);
+		mlm.run(context, null, new CallTrigger());
 
 		Assert.assertEquals("", context.getOutputText());
 	}
@@ -161,7 +164,7 @@ public class ExampleTest extends ImplementationTest {
 		ArdenList patientReactions = new ArdenList(new ArdenValue[] { new ArdenString("r1"), new ArdenString("r2"),
 				new ArdenString("r3") });
 		ArdenValue[] result = mlm.run(context, new ArdenValue[] { medOrders, medAllergens, patientAllergies,
-				patientReactions });
+				patientReactions }, new CallTrigger());
 		Assert.assertEquals(3, result.length);
 
 		Assert.assertEquals("(\"order1\",\"order2\")", result[0].toString());

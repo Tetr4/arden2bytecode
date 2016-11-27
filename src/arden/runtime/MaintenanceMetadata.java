@@ -32,21 +32,20 @@ import java.util.Date;
 public class MaintenanceMetadata {
 	private String title;
 	private String mlmName;
-	private String ardenVersion;
+	private ArdenVersion ardenVersion;
 	private String version;
 	private String institution;
 	private String author;
 	private String specialist;
 	private Date date;
-	private String validation;
+	private Validation validation;
 	
 	public MaintenanceMetadata() {
 		
 	}
 	
-	public MaintenanceMetadata(String title, String mlmName, String ardenVersion, String version, String institution,
-			String author, String specialist, Date date, String validation) {
-		super();
+	public MaintenanceMetadata(String title, String mlmName, ArdenVersion ardenVersion, String version, String institution,
+			String author, String specialist, Date date, Validation validation) {
 		this.title = title;
 		this.mlmName = mlmName;
 		this.ardenVersion = ardenVersion;
@@ -74,11 +73,11 @@ public class MaintenanceMetadata {
 		return mlmName;
 	}
 
-	public void setArdenVersion(String ardenVersion) {
+	public void setArdenVersion(ArdenVersion ardenVersion) {
 		this.ardenVersion = ardenVersion;
 	}
 
-	public String getArdenVersion() {
+	public ArdenVersion getArdenVersion() {
 		return ardenVersion;
 	}
 
@@ -122,11 +121,52 @@ public class MaintenanceMetadata {
 		return date;
 	}
 
-	public void setValidation(String validation) {
+	public void setValidation(Validation validation) {
 		this.validation = validation;
 	}
 
-	public String getValidation() {
+	public Validation getValidation() {
 		return validation;
 	}
+
+	public enum Validation {
+		EXPIRED,
+		TESTING,
+		RESEARCH,
+		PRODUCTION
+	}
+
+	public enum ArdenVersion implements Comparable<ArdenVersion> {
+		V1(1, 0), // ASTM E1460-1992
+		V2(2, 0),
+		V2_1(2, 1),
+		V2_5(2, 5);
+		// not supported yet:
+		// V2_6(2, 6),
+		// V2_7(2, 7),
+		// V2_8(2, 8),
+		// V2_9(2, 9),
+		// V2_10(2, 10);
+
+		public final int major;
+		public final int minor;
+
+		private ArdenVersion(int major, int minor) {
+			this.major = major;
+			this.minor = minor;
+		}
+
+		@Override
+		public String toString() {
+			// e.g. "Version 2.5"
+			StringBuilder versionBuilder = new StringBuilder("Version ");
+			versionBuilder.append(major);
+			if (minor != 0) {
+				versionBuilder.append('.');
+				versionBuilder.append(minor);
+			}
+			return versionBuilder.toString();
+		}
+	}
+
 }

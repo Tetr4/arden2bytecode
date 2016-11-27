@@ -5,12 +5,9 @@ import java.util.List;
 
 import arden.runtime.ArdenEvent;
 import arden.runtime.ArdenTime;
-import arden.runtime.ExecutionContext;
 
-public class AnyTrigger implements Trigger {
-
-	private Trigger activeTrigger = null;
-	private List<Trigger> triggers;
+public final class AnyTrigger implements Trigger {
+	private final List<Trigger> triggers;
 
 	public AnyTrigger(Trigger[] triggers) {
 		this.triggers = Arrays.asList(triggers);
@@ -21,11 +18,11 @@ public class AnyTrigger implements Trigger {
 	}
 
 	@Override
-	public ArdenTime getNextRunTime(ExecutionContext context) {
+	public ArdenTime getNextRunTime() {
 		// Find oldest trigger/event
 		ArdenTime oldest = null;
 		for (Trigger trigger : triggers) {
-			ArdenTime nextRunTime = trigger.getNextRunTime(context);
+			ArdenTime nextRunTime = trigger.getNextRunTime();
 			if (nextRunTime != null && (oldest == null || oldest.compareTo(nextRunTime) > 0)) {
 				oldest = nextRunTime;
 			}
@@ -55,7 +52,6 @@ public class AnyTrigger implements Trigger {
 		for (Trigger trigger : triggers) {
 			ArdenEvent triggeringEvent = trigger.getTriggeringEvent();
 			if (triggeringEvent != null) {
-				activeTrigger = trigger;
 				return triggeringEvent;
 			}
 		}
@@ -64,10 +60,12 @@ public class AnyTrigger implements Trigger {
 
 	@Override
 	public long getDelay() {
-		if (activeTrigger == null) {
-			return 0;
+		for (Trigger trigger : triggers) {
+			ArdenEvent triggeringEvent = trigger.getTriggeringEvent();
+			if (triggeringEvent != null) {
+				return trigger.getDelay();
+			}
 		}
-		return activeTrigger.getDelay();
+		return 0;
 	}
-
 }

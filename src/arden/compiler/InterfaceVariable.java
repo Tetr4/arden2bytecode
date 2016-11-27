@@ -25,26 +25,34 @@
 // IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 // OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package arden.runtime;
+package arden.compiler;
 
-import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 
-import arden.runtime.evoke.Trigger;
+import arden.codegenerator.FieldReference;
+import arden.compiler.node.TIdentifier;
+import arden.runtime.ArdenRunnable;
 
-/**
- * 
- * Represents an executable entity (example: MedicalLogicModule).
- * 
- * @author Daniel Grunwald
- *
- */
-public interface ArdenRunnable {
-	/**
-	 * Executes the MLM.
-	 * 
-	 * @return Returns the value(s) provided by the "return" statement, or
-	 *         (Java) null if no return statement was executed.
-	 */
-	ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments, Trigger evokingTrigger)
-			throws InvocationTargetException;
+/** INTERFACE Variables */
+final class InterfaceVariable extends CallableVariable {
+
+	protected InterfaceVariable(TIdentifier varName, FieldReference runnableField) {
+		super(varName, runnableField);
+	}
+
+	/** Gets the InterfaceVariable for the LHSR, or creates it on demand. */
+	public static InterfaceVariable getVariable(CodeGenerator codeGen, LeftHandSideResult lhs) {
+		if (!(lhs instanceof LeftHandSideIdentifier))
+			throw new RuntimeCompilerException(lhs.getPosition(), "INTERFACE variables must be simple identifiers");
+		TIdentifier ident = ((LeftHandSideIdentifier) lhs).identifier;
+		Variable variable = codeGen.getVariable(ident.getText());
+		if (variable instanceof InterfaceVariable) {
+			return (InterfaceVariable) variable;
+		} else {
+			FieldReference mlmField = codeGen.createField(ident.getText(), ArdenRunnable.class, Modifier.PRIVATE);
+			InterfaceVariable cv = new InterfaceVariable(ident, mlmField);
+			codeGen.addVariable(cv);
+			return cv;
+		}
+	}
 }

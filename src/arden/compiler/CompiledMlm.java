@@ -47,6 +47,7 @@ import arden.runtime.LibraryMetadata;
 import arden.runtime.MaintenanceMetadata;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.MedicalLogicModuleImplementation;
+import arden.runtime.evoke.CallTrigger;
 import arden.runtime.evoke.Trigger;
 
 /**
@@ -69,7 +70,7 @@ public final class CompiledMlm implements MedicalLogicModule {
 	Class<? extends MedicalLogicModuleImplementation> clazz = null;
 	private MedicalLogicModuleImplementation uninitializedInstance = null;	
 	private MedicalLogicModuleImplementation initializedInstance = null;
-	private Trigger trigger = null;
+	private Trigger[] triggers = null;
 	private String mlmname;
 
 	public CompiledMlm(byte[] data, String mlmname) {
@@ -128,7 +129,7 @@ public final class CompiledMlm implements MedicalLogicModule {
 		// compiled it, so wrap all the checked exceptions that should never
 		// occur.
 		try {
-			ctor = clazz.getConstructor(ExecutionContext.class, MedicalLogicModule.class, ArdenValue[].class);
+			ctor = clazz.getConstructor(ExecutionContext.class, MedicalLogicModule.class, ArdenValue[].class, Trigger.class);
 		} catch (SecurityException e) {
 			throw new RuntimeException(e);
 		} catch (NoSuchMethodException e) {
@@ -156,7 +157,7 @@ public final class CompiledMlm implements MedicalLogicModule {
 
 	/** Creates an instance of the implementation class. */
 	@Override
-	public MedicalLogicModuleImplementation createInstance(ExecutionContext context, ArdenValue[] arguments)
+	public MedicalLogicModuleImplementation createInstance(ExecutionContext context, ArdenValue[] arguments, Trigger evokingTrigger)
 			throws InvocationTargetException {
 		if (context == null)
 			throw new NullPointerException();
@@ -164,8 +165,11 @@ public final class CompiledMlm implements MedicalLogicModule {
 		if (arguments == null)
 			arguments = ArdenList.EMPTY.values;
 
+		if (evokingTrigger == null)
+			evokingTrigger = new CallTrigger();
+
 		try {
-			return getConstructor().newInstance(context, this, arguments);
+			return getConstructor().newInstance(context, this, arguments, evokingTrigger);
 		} catch (IllegalArgumentException e) {
 			throw new RuntimeException(e);
 		} catch (InstantiationException e) {
@@ -182,8 +186,8 @@ public final class CompiledMlm implements MedicalLogicModule {
 	 *         (Java) null if no return statement was executed.
 	 */
 	@Override
-	public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments) throws InvocationTargetException {
-		MedicalLogicModuleImplementation instance = createInstance(context, arguments);
+	public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments, Trigger evokingTrigger) throws InvocationTargetException {
+		MedicalLogicModuleImplementation instance = createInstance(context, arguments, evokingTrigger);
 		initializedInstance = instance;
 		try {
 			if (instance.logic(context))
@@ -248,15 +252,15 @@ public final class CompiledMlm implements MedicalLogicModule {
 	 * data set in the constructor, the data section of the MLM is run.
 	 */
 	@Override
-	public Trigger getTrigger(ExecutionContext context, ArdenValue[] arguments) throws InvocationTargetException {
-		if (trigger == null) {
+	public Trigger[] getTriggers(ExecutionContext context) throws InvocationTargetException {
+		if (triggers == null) {
 			MedicalLogicModuleImplementation instance = initializedInstance;
 			if (instance == null) {
-				instance = createInstance(context, arguments);
+				instance = createInstance(context, null, null);
 			}
-			trigger = instance.getTrigger(context);
+			triggers = instance.getTriggers(context);
 		}
-		return trigger;
+		return triggers;
 	}
 
 	public ArdenValue getValue(String name) {

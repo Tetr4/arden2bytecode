@@ -27,7 +27,6 @@
 
 package arden.runtime;
 
-import arden.runtime.evoke.NeverTrigger;
 import arden.runtime.evoke.Trigger;
 
 /**
@@ -39,7 +38,7 @@ import arden.runtime.evoke.Trigger;
 public abstract class MedicalLogicModuleImplementation {
 	// All derived classes are expected to have a constructor taking:
 	// (ExecutionContext context, MedicalLogicModule self, ArdenValue[]
-	// arguments)
+	// arguments, Trigger evokingTrigger)
 	// None of the arguments may be null.
 
 	/** Executes the logic block. */
@@ -81,8 +80,8 @@ public abstract class MedicalLogicModuleImplementation {
 	/**
 	 * Gets the trigger when this MLM should be invoked
 	 */
-	public Trigger getTrigger(ExecutionContext context) {
-		return new NeverTrigger();
+	public Trigger[] getTriggers(ExecutionContext context) {
+		return new Trigger[]{};
 	}
 	
 	/**

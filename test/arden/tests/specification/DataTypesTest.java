@@ -37,30 +37,28 @@ public class DataTypesTest extends SpecificationTest {
 	@Test
 	@Compatibility(min = ArdenVersion.V2)
 	public void testTriggerTime() throws Exception {
-		// event delay
+		// trigger delay
 		String eventMapping = getMappings().createEventMapping();
 		String eventDelay = createCodeBuilder()
 				.addData("test_event := EVENT {" + eventMapping + "};")
 				.addEvoke(".5 SECONDS AFTER TIME OF test_event")
-				.addAction("WRITE EVENTTIME = TRIGGERTIME + .5 SECONDS;")
+				.addAction("WRITE TRIGGERTIME = EVENTTIME + .5 SECONDS;")
 				.addAction("WRITE TRIGGERTIME <= NOW;")
 				.toString();
 		assertWritesAfterEvent(eventDelay, eventMapping, "TRUE", "TRUE");
 
-		// event delay + call delay
+		// call delay
 		String startEvent = getMappings().createEventMapping();
-		String callEvent = getMappings().createEventMapping();
 		String othermlm = createCodeBuilder()
 				.setName("other_mlm")
-				.addEvoke(".5 SECONDS AFTER TIME OF call_event") // 2. delay
-				.addAction("WRITE EVENTTIME = TRIGGERTIME + 1 SECOND;")
+				.addAction("WRITE TRIGGERTIME = EVENTTIME + .5 SECOND;")
 				.toString();
 		String combinedDelay = createCodeBuilder()
 				.addMlm(othermlm)
 				.addData("start_event := EVENT {" + startEvent + "};")
-				.addData("call_event := EVENT {" + callEvent + "};")
+				.addData("other_mlm := MLM 'other_mlm';")
 				.addEvoke("start_event")
-				.addAction("CALL call_event DELAY 0.5 SECONDS;") // 1. delay
+				.addAction("CALL other_mlm DELAY 0.5 SECONDS;") // 1. delay
 				.toString();
 		assertWritesAfterEvent(combinedDelay, startEvent, "TRUE");
 	}

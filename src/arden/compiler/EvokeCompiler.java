@@ -38,7 +38,6 @@ import arden.runtime.ExecutionContext;
 import arden.runtime.evoke.AnyTrigger;
 import arden.runtime.evoke.EventTrigger;
 import arden.runtime.evoke.FixedDateTrigger;
-import arden.runtime.evoke.NeverTrigger;
 import arden.runtime.evoke.Trigger;
 
 public class EvokeCompiler extends VisitorBase {
@@ -106,27 +105,32 @@ public class EvokeCompiler extends VisitorBase {
 	
 	@Override
 	public void caseAEvokeSlot(AEvokeSlot evokeSlot) {
-		List<PEvokeStatement> statements = listEvokeBlocks(evokeSlot.getEvokeBlock());
-		if (statements.size() > 1) {
-			throw new RuntimeCompilerException(evokeSlot.getEvokeColon(), "not implemented yet");
-		} else if (statements.size() == 1) {
-			statements.get(0).apply(this);
-		} else {
-			throw new RuntimeCompilerException(evokeSlot.getEvokeColon(), "no evoke statement given");
+		List<PEvokeStatement> allStatements = listEvokeBlocks(evokeSlot.getEvokeBlock());
+		List<PEvokeStatement> triggerStatements = filterTriggerStatements(allStatements);
+		
+		// create new trigger array
+		context.writer.loadIntegerConstant(triggerStatements.size());
+		context.writer.newArray(Trigger.class);
+		
+		// fill array
+		int index = 0;
+		for (PEvokeStatement statement : triggerStatements) {
+			context.writer.dup();
+			context.writer.loadIntegerConstant(index++);
+			statement.apply(this);
+			context.writer.storeObjectToArray();
 		}
 	}
 	
-	@Override
-	public void caseAEmptyEvokeStatement(AEmptyEvokeStatement stmt) {
-		context.writer.newObject(NeverTrigger.class);
-		context.writer.dup();
-		try {
-			context.writer.invokeConstructor(NeverTrigger.class.getConstructor());
-		} catch (NoSuchMethodException e) {
-			throw new RuntimeException(e);
-		} catch (SecurityException e) {
-			throw new RuntimeException(e);
+	private List<PEvokeStatement> filterTriggerStatements(List<PEvokeStatement> statements) {
+		List<PEvokeStatement> triggerStatements = new ArrayList<>();
+		for (PEvokeStatement statement : statements) {
+			// don't generate Trigger for empty slot or deprecated "CALL" keyword
+			if (! (statement instanceof AEmptyEvokeStatement) && !(statement instanceof ACallEvokeStatement)) {
+				triggerStatements.add(statement);
+			}
 		}
+		return triggerStatements;
 	}
 	
 	@Override
@@ -312,8 +316,4 @@ public class EvokeCompiler extends VisitorBase {
 		context.writer.invokeStatic(ExpressionCompiler.getMethod("timeOf", Trigger.class, ExecutionContext.class));
 	}
 	
-	@Override
-	public void caseACallEvokeStatement(ACallEvokeStatement node) {
-		context.writer.invokeStatic(ExpressionCompiler.getMethod("evokeSlotCall"));
-	}
 }

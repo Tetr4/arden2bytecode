@@ -10,6 +10,7 @@ import arden.runtime.ArdenTime;
 import arden.runtime.ArdenValue;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.MedicalLogicModuleImplementation;
+import arden.runtime.evoke.CallTrigger;
 import arden.runtime.evoke.Trigger;
 
 public class ScenarioEngine {
@@ -26,7 +27,7 @@ public class ScenarioEngine {
 
 	public void callMlm(ArdenValue[] args) {
 		resetCapturedOutput();
-		doCallMlm(args);
+		doCallMlm(args, new CallTrigger());
 	}
 
 	public void callEvent(String mapping, ArdenTime primaryTime, ArdenTime eventTime) {
@@ -42,29 +43,32 @@ public class ScenarioEngine {
 		}
 
 		try {
-			Trigger trigger = mlmUnderTest.getTrigger(context, null);
-			trigger.scheduleEvent(event);
-			if (trigger.runOnEvent(event)) {
-				context.setEvokingEvent(event, 0);
-				isTriggered = true;
-				doCallMlm(null);
+			Trigger[] triggers = mlmUnderTest.getTriggers(context);
+			for (Trigger trigger : triggers) {
+				trigger.scheduleEvent(event);
+				if (trigger.runOnEvent(event)) {
+					isTriggered = true;
+					doCallMlm(null, trigger);
+					return;
+				}
 			}
 		} catch (InvocationTargetException e) {
 			throw new AssertionError("Could not create MLM instance", e);
 		}
-
 	}
 
 	public void setTime(ArdenTime currentTime) {
 		resetCapturedOutput();
 		context.setCurrentTime(currentTime);
 		try {
-			Trigger trigger = mlmUnderTest.getTrigger(context, null);
-			ArdenTime nextRunTime = trigger.getNextRunTime(context);
-			if (nextRunTime != null && nextRunTime.value - currentTime.value <= 0) {
-				isTriggered = true;
-				context.setEvokingEvent(trigger.getTriggeringEvent(), trigger.getDelay());
-				doCallMlm(null);
+			Trigger[] triggers = mlmUnderTest.getTriggers(context);
+			for (Trigger trigger : triggers) {
+				ArdenTime nextRunTime = trigger.getNextRunTime();
+				if (nextRunTime != null && nextRunTime.value - currentTime.value <= 0) {
+					isTriggered = true;
+					doCallMlm(null, trigger);
+					return;
+				}
 			}
 		} catch (InvocationTargetException e) {
 			throw new AssertionError("Could not create MLM instance", e);
@@ -78,10 +82,10 @@ public class ScenarioEngine {
 		isTriggered = false;
 	}
 
-	private void doCallMlm(ArdenValue[] args) {
+	private void doCallMlm(ArdenValue[] args, Trigger trigger) {
 		MedicalLogicModuleImplementation instance;
 		try {
-			instance = mlmUnderTest.createInstance(context, args);
+			instance = mlmUnderTest.createInstance(context, args, trigger);
 			if (instance.logic(context)) {
 				conclude = ArdenBoolean.create(true, ArdenValue.NOPRIMARYTIME);
 				returnValues = instance.action(context);

@@ -7,10 +7,13 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
 
-import arden.compiler.CompiledMlm;
 import arden.compiler.CompilerException;
+import arden.runtime.ArdenDuration;
 import arden.runtime.ArdenEvent;
+import arden.runtime.ArdenTime;
 import arden.runtime.ArdenValue;
+import arden.runtime.MedicalLogicModule;
+import arden.runtime.evoke.CallTrigger;
 import arden.tests.specification.testcompiler.ArdenVersion;
 import arden.tests.specification.testcompiler.TestCompiler;
 import arden.tests.specification.testcompiler.TestCompilerCompiletimeException;
@@ -60,9 +63,9 @@ public class TestCompilerImpl implements TestCompiler {
 	@Override
 	public TestCompilerResult compileAndRun(String code) throws TestCompilerException {
 		// compile
-		List<CompiledMlm> compiledMlms;
+		List<MedicalLogicModule> compiledMlms = new ArrayList<>();
 		try {
-			compiledMlms = compiler.compile(new StringReader(code));
+			compiledMlms.addAll(compiler.compile(new StringReader(code)));
 		} catch (CompilerException e) {
 			throw new TestCompilerCompiletimeException(e);
 		} catch (IOException e) {
@@ -70,13 +73,13 @@ public class TestCompilerImpl implements TestCompiler {
 		}
 
 		// run and save return values
-		CompiledMlm firstMlm = compiledMlms.get(0);
-		TestContext context = new TestContext(compiledMlms, firstMlm.getMaintenance().getInstitution());
+		MedicalLogicModule firstMlm = compiledMlms.get(0);
+		TestContext context = new TestContext(compiledMlms);
 		TestCompilerResult result = new TestCompilerResult();
 
 		ArdenValue[] returnValues;
 		try {
-			returnValues = firstMlm.run(context, null);
+			returnValues = firstMlm.run(context, null, new CallTrigger());
 		} catch (Exception e) {
 			throw new TestCompilerRuntimeException(e);
 		} catch (Error e) {
@@ -97,9 +100,9 @@ public class TestCompilerImpl implements TestCompiler {
 	public TestCompilerDelayedMessage[] compileAndRunForEvent(String code, String eventMapping, int messagesToCollect)
 			throws TestCompilerException {
 		// compile
-		List<CompiledMlm> compiledMlms = new ArrayList<>();
+		List<MedicalLogicModule> compiledMlms = new ArrayList<>();
 		try {
-			compiledMlms = compiler.compile(new StringReader(code));
+			compiledMlms.addAll(compiler.compile(new StringReader(code)));
 		} catch (CompilerException e) {
 			throw new TestCompilerCompiletimeException(e);
 		} catch (IOException e) {
@@ -108,15 +111,16 @@ public class TestCompilerImpl implements TestCompiler {
 
 		// create constant time for deterministic tests
 		Calendar calendar = new GregorianCalendar();
-		calendar.set(2010, 1, 2, 3, 4, 5);
+		calendar.clear();
+		ArdenTime startTime = new ArdenTime(calendar.getTimeInMillis());
 		ArdenEvent event = new ArdenEvent(eventMapping, calendar.getTimeInMillis());
+		
+		TestEngine engine = new TestEngine(compiledMlms, startTime);
+		engine.call(event, ArdenDuration.ZERO, 50);
 
 		// collect messages
-		CompiledMlm firstMlm = compiledMlms.get(0);
-		TestEngine engine = new TestEngine(compiledMlms, firstMlm.getMaintenance().getInstitution());
 		List<TestCompilerDelayedMessage> messages = new ArrayList<>();
 		try {
-			engine.callEvent(event);
 			while (messages.size() < messagesToCollect) {
 				messages.add(engine.getNextDelayedMessage());
 			}

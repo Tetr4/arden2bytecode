@@ -72,6 +72,8 @@ import arden.compiler.parser.ParserException;
 import arden.runtime.ArdenValue;
 import arden.runtime.LibraryMetadata;
 import arden.runtime.MaintenanceMetadata;
+import arden.runtime.MaintenanceMetadata.ArdenVersion;
+import arden.runtime.MaintenanceMetadata.Validation;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.RuntimeHelpers;
 import arden.runtime.evoke.Trigger;
@@ -143,25 +145,26 @@ public final class Compiler {
 	}
 
 	private CompiledMlm doCompileMlm(AMlm mlm) {
-		// collect metadata
-		MetadataCompiler metadata = new MetadataCompiler();
-		mlm.getMaintenanceCategory().apply(metadata);
-		mlm.getLibraryCategory().apply(metadata);
+		// use this to print the generated AST
+		// mlm.apply(new PrintTreeVisitor(System.out));
 
+		// compile metadata
+		MetadataCompiler metadata = new MetadataCompiler();
 		AKnowledgeCategory knowledgeCategory = (AKnowledgeCategory) mlm.getKnowledgeCategory();
 		AKnowledgeBody knowledge = (AKnowledgeBody) knowledgeCategory.getKnowledgeBody();
+		mlm.getMaintenanceCategory().apply(metadata);
+		mlm.getLibraryCategory().apply(metadata);
 		knowledge.getPrioritySlot().apply(metadata);
 
-		// System.out.println(knowledge.toString());
-		// knowledge.apply(new PrintTreeVisitor(System.out));
+		// check for errors
+		mlm.apply(new ErrorAnalysis());
 
-		// compile knowledge slots
-		CodeGenerator codeGen = new CodeGenerator(metadata.maintenance.getMlmName(), knowledgeCategory.getKnowledgeColon()
-				.getLine());
+		// compile knowledge category
+		CodeGenerator codeGen = new CodeGenerator(metadata.maintenance.getMlmName(),
+				knowledgeCategory.getKnowledgeColon().getLine());
 		if (isDebuggingEnabled)
 			codeGen.enableDebugging(sourceFileName);
-
-		compileData(codeGen, knowledge.getDataSlot());
+		compileData(codeGen, knowledge.getDataSlot(), metadata.maintenance.getInstitution());
 		compileLogic(codeGen, knowledge.getLogicSlot());
 		compileAction(codeGen, knowledge.getActionSlot());
 		compileEvoke(codeGen, knowledge.getEvokeSlot());
@@ -172,7 +175,7 @@ public final class Compiler {
 		if (validationCategory != null) {
 			PValidationBody validation = ((AValidationCategory) validationCategory).getValidationBody();
 			try {
-				compileValidation(codeGen, validation, metadata.maintenance.getMlmName());
+				compileValidation(codeGen, validation, metadata.maintenance);
 			} catch (NoSuchMethodException e) {
 				throw new RuntimeException(e);
 			} catch (SecurityException e) {
@@ -191,8 +194,10 @@ public final class Compiler {
 			throw new RuntimeException(e);
 		}
 
+		// create method to access the MLMs variables
 		codeGen.createGetValue();
 
+		// save bytecode to a CompiledMlm wrapper
 		byte[] data;
 		try {
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -209,12 +214,15 @@ public final class Compiler {
 	private void compileMaintenance(CodeGenerator codeGen, MaintenanceMetadata maintenance) throws NoSuchMethodException, SecurityException {		
 		FieldReference maintenanceField = codeGen.createStaticFinalField(MaintenanceMetadata.class);
 		MethodWriter init = codeGen.getStaticInitializer();
-		// format = new MaintenanceMetadata(String title, String mlmName, String ardenVersion, String version, String institution, String author, String specialist, Date date, String validation)
+		// format = new MaintenanceMetadata(String title, String mlmName, ArdenVersion ardenVersion, String version, String institution, String author, String specialist, Date date, Validation validation)
 		init.newObject(MaintenanceMetadata.class);
 		init.dup();
 		init.loadStringConstant(maintenance.getTitle());
 		init.loadStringConstant(maintenance.getMlmName());
-		init.loadStringConstant(maintenance.getArdenVersion());
+		
+		init.loadStringConstant(maintenance.getArdenVersion().name());
+		init.invokeStatic(ArdenVersion.class.getMethod("valueOf", String.class));
+		
 		init.loadStringConstant(maintenance.getVersion());
 		init.loadStringConstant(maintenance.getInstitution());
 		init.loadStringConstant(maintenance.getAuthor());
@@ -225,9 +233,10 @@ public final class Compiler {
 		init.loadLongConstant(maintenance.getDate().getTime());
 		init.invokeConstructor(Date.class.getConstructor(new Class<?>[]{Long.TYPE}));
 		
-		init.loadStringConstant(maintenance.getValidation());
+		init.loadStringConstant(maintenance.getValidation().name());
+		init.invokeStatic(Validation.class.getMethod("valueOf", String.class));
 		
-		init.invokeConstructor(MaintenanceMetadata.class.getConstructor(new Class<?>[]{String.class, String.class, String.class, String.class, String.class, String.class, String.class, Date.class, String.class}));
+		init.invokeConstructor(MaintenanceMetadata.class.getConstructor(new Class<?>[]{String.class, String.class, ArdenVersion.class, String.class, String.class, String.class, String.class, Date.class, Validation.class}));
 		init.storeStaticField(maintenanceField);
 		
 		CompilerContext context = codeGen.createMaintenance();
@@ -267,37 +276,37 @@ public final class Compiler {
 		context.writer.loadDoubleConstant(priority);
 		context.writer.returnDoubleFromFunction();
 	}
-	
-	private void compileEvoke(CodeGenerator codeGen, PEvokeSlot evokeSlot) {
-		CompilerContext context = codeGen.createTrigger();
 
-		// event is a keyword, thus there cannot be another field named 'event'
-		FieldReference triggerField = context.codeGenerator.createField("event", Trigger.class, Modifier.PRIVATE);
-		
+	private void compileEvoke(CodeGenerator codeGen, PEvokeSlot evokeSlot) {
+		CompilerContext context = codeGen.createTriggers();
+
+		// evoke is a keyword, thus there cannot be another 'evoke' field
+		FieldReference triggerField = context.codeGenerator.createField("evoke", Trigger[].class, Modifier.PRIVATE);
+
 		Label isNull = new Label();
-		
+
 		context.writer.loadThis();
 		context.writer.loadInstanceField(triggerField);
 		context.writer.jumpIfNull(isNull);
+
 		context.writer.loadThis();
 		context.writer.loadInstanceField(triggerField);
 		context.writer.returnObjectFromFunction();
-		
-		context.writer.mark(isNull);		
-		evokeSlot.apply(new EvokeCompiler(context)); 
-		
-		// the evoke compiler is supposed to leave a Trigger subclass instance on the stack		
+
+		context.writer.mark(isNull);
+		evokeSlot.apply(new EvokeCompiler(context));
+		// the evoke compiler is supposed to leave a Trigger array on the stack
 		context.writer.dup();
 		context.writer.loadThis();
 		context.writer.swap();
 		context.writer.storeInstanceField(triggerField);
 		context.writer.returnObjectFromFunction();
 	}
-	
-	private void compileData(CodeGenerator codeGen, PDataSlot dataSlot) {
+
+	private void compileData(CodeGenerator codeGen, PDataSlot dataSlot, String institutionSelf) {
 		int lineNumber = ((ADataSlot) dataSlot).getDataColon().getLine();
 		CompilerContext context = codeGen.createConstructor(lineNumber);
-		dataSlot.apply(new DataCompiler(context));
+		dataSlot.apply(new DataCompiler(context, institutionSelf));
 		context.writer.returnFromProcedure();
 	}
 
@@ -354,7 +363,7 @@ public final class Compiler {
 		return urgency;
 	}
 
-	private void compileValidation(CodeGenerator codeGen, PValidationBody validation, String mlmSelf)
+	private void compileValidation(CodeGenerator codeGen, PValidationBody validation, MaintenanceMetadata maintenance)
 			throws NoSuchMethodException, SecurityException {
 		LinkedList<PScenarioSlot> scenarios = ((AValidationBody) validation).getScenarioSlot();
 		for (PScenarioSlot scenario : scenarios) {
@@ -372,8 +381,8 @@ public final class Compiler {
 			// load mlm under test
 			final int mlmUnderTestVar = context.allocateVariable();
 			context.writer.loadVariable(contextVar);
-			context.writer.loadStringConstant(mlmSelf);
-			context.writer.loadNull();
+			context.writer.loadStringConstant(maintenance.getMlmName());
+			context.writer.loadStringConstant(maintenance.getInstitution());
 			context.writer.invokeInstance(ExecutionContextMethods.findModule);
 			context.writer.storeVariable(mlmUnderTestVar);
 
@@ -387,7 +396,7 @@ public final class Compiler {
 			context.writer.storeVariable(engineVar);
 			
 			// compile statements
-			scenario.apply(new ScenarioCompiler(context, mlmUnderTestVar, contextVar, engineVar));
+			scenario.apply(new ScenarioCompiler(context, maintenance.getInstitution(), mlmUnderTestVar, contextVar, engineVar));
 			
 			// void return
 			context.writer.returnFromProcedure();

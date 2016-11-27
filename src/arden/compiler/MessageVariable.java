@@ -25,26 +25,50 @@
 // IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 // OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package arden.runtime;
+package arden.compiler;
 
-import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 
-import arden.runtime.evoke.Trigger;
+import arden.codegenerator.FieldReference;
+import arden.compiler.node.TIdentifier;
+import arden.compiler.node.Token;
+import arden.runtime.ArdenValue;
 
 /**
- * 
- * Represents an executable entity (example: MedicalLogicModule).
- * 
- * @author Daniel Grunwald
- *
+ * An instance field of type {@link ArdenValue} is stored in the MLM
+ * implementation class. It is set in the data block where the
+ * <code>MESSAGE</code> or <code>MESSAGE AS</code> statement occurs and used for
+ * <code>WRITE AT</code> statements.
  */
-public interface ArdenRunnable {
+final class MessageVariable extends Variable {
+	final FieldReference field;
+
+	private MessageVariable(TIdentifier name, FieldReference field) {
+		super(name);
+		this.field = field;
+	}
+
 	/**
-	 * Executes the MLM.
-	 * 
-	 * @return Returns the value(s) provided by the "return" statement, or
-	 *         (Java) null if no return statement was executed.
+	 * Gets the MessageVariable for the LHSR, or creates it on demand.
 	 */
-	ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments, Trigger evokingTrigger)
-			throws InvocationTargetException;
+	public static MessageVariable getVariable(CodeGenerator codeGen, LeftHandSideResult lhs) {
+		if (!(lhs instanceof LeftHandSideIdentifier))
+			throw new RuntimeCompilerException(lhs.getPosition(), "MESSAGE variables must be simple identifiers");
+		TIdentifier ident = ((LeftHandSideIdentifier) lhs).identifier;
+		Variable variable = codeGen.getVariable(ident.getText());
+		if (variable instanceof MessageVariable) {
+			return (MessageVariable) variable;
+		} else {
+			FieldReference mlmField = codeGen.createField(ident.getText(), ArdenValue.class, Modifier.PRIVATE);
+			MessageVariable dv = new MessageVariable(ident, mlmField);
+			codeGen.addVariable(dv);
+			return dv;
+		}
+	}
+	
+	@Override
+	public void loadValue(CompilerContext context, Token errorPosition) {
+		context.writer.loadThis();
+		context.writer.loadInstanceField(field);
+	}
 }

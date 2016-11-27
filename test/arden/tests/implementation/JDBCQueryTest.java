@@ -29,6 +29,7 @@ import arden.runtime.ArdenString;
 import arden.runtime.ArdenValue;
 import arden.runtime.ExecutionContext;
 import arden.runtime.MedicalLogicModule;
+import arden.runtime.evoke.CallTrigger;
 import arden.runtime.jdbc.DriverHelper;
 import arden.runtime.jdbc.JDBCExecutionContext;
 import arden.runtime.jdbc.JDBCQuery;
@@ -145,7 +146,7 @@ public class JDBCQueryTest extends ImplementationTest {
 				"(varE, varF) := read {select * from person};\n", 
 				"conclude true;", 
 				"return (varE, varF);");
-		ArdenValue[] result = mlm.run(testContext, null);
+		ArdenValue[] result = mlm.run(testContext, null, new CallTrigger());
 		Assert.assertEquals(1, result.length);
 
 		ArdenValue[] expected = {new ArdenNumber(1), new ArdenNumber(2), 
