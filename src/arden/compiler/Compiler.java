@@ -378,12 +378,14 @@ public final class Compiler {
 			context.writer.invokeConstructor(ScenarioExecutionContext.class.getConstructor());
 			context.writer.storeVariable(contextVar);
 			
-			// load mlm under test
+			// load MLM under test by creating a new CompiledMLM from the class of this MLM
 			final int mlmUnderTestVar = context.allocateVariable();
-			context.writer.loadVariable(contextVar);
+			context.writer.newObject(CompiledMlm.class);
+			context.writer.dup();
+			context.writer.loadThis();
+			context.writer.invokeInstance(Object.class.getMethod("getClass"));
 			context.writer.loadStringConstant(maintenance.getMlmName());
-			context.writer.loadStringConstant(maintenance.getInstitution());
-			context.writer.invokeInstance(ExecutionContextMethods.findModule);
+			context.writer.invokeConstructor(CompiledMlm.class.getConstructor(Class.class, String.class));
 			context.writer.storeVariable(mlmUnderTestVar);
 
 			// create engine as local variable

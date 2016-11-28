@@ -84,6 +84,11 @@ public final class CompiledMlm implements MedicalLogicModule {
 		this.mlmname = getName();
 	}
 	
+	public CompiledMlm(Class<? extends MedicalLogicModuleImplementation> clazz, String mlmname) throws IOException {
+		this((byte[]) null, mlmname);
+		this.clazz = clazz;
+	}
+
 	public CompiledMlm(File mlmfile, String mlmname) throws IOException {		
 		this((byte[]) null, mlmname);
 		if (this.mlmname == null) {
