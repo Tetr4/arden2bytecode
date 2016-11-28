@@ -15,7 +15,9 @@ import org.junit.runners.Suite.SuiteClasses;
 	JDBCQueryTest.class,
 	LoadMlmFromBytecodeTest.class,
 	MetadataTest.class,
-	RuntimeTest.class
+	RuntimeTest.class,
+	ValidationTest.class,
+	ValidationSyntaxTest.class
 })
 public class ImplementationTestSuite {
 }
