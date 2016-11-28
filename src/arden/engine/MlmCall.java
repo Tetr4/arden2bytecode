@@ -8,10 +8,10 @@ import arden.runtime.ExecutionContext;
 import arden.runtime.evoke.Trigger;
 
 public final class MlmCall extends Call {
-	private final ArdenRunnable runnable;
-	private final ArdenValue[] args;
-	private final Trigger trigger;
-	private final ExecutionContext context;
+	public final ArdenRunnable runnable;
+	public final ArdenValue[] args;
+	public final Trigger trigger;
+	public final ExecutionContext context;
 
 	public MlmCall(ExecutionContext context, ArdenRunnable runnable, ArdenValue[] args, Trigger trigger, int priority) {
 		super(priority);

@@ -9,9 +9,9 @@ import arden.runtime.MedicalLogicModule;
 import arden.runtime.evoke.Trigger;
 
 public final class EventCall extends Call {
-	private final ArdenEvent event;
-	private final ExecutionContext context;
-	private final Iterable<MedicalLogicModule> mlms;
+	public final ArdenEvent event;
+	public final ExecutionContext context;
+	public final Iterable<MedicalLogicModule> mlms;
 
 	public EventCall(ExecutionContext context, Iterable<MedicalLogicModule> mlms, ArdenEvent event, int urgency) {
 		// handle events before MlmCalls (highest priority/urgency is 99)

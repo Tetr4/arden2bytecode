@@ -1,7 +1,7 @@
 package arden.engine;
 
 public abstract class Call implements Runnable, Comparable<Call> {
-	private final int priority;
+	public final int priority;
 
 	public Call(int priority) {
 		this.priority = priority;

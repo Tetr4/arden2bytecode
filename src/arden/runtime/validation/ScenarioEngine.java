@@ -1,9 +1,15 @@
 package arden.runtime.validation;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
+import java.util.Map.Entry;
+import java.util.Queue;
 
 import org.junit.Assert;
 
+import arden.engine.Call;
+import arden.engine.MlmCall;
+import arden.engine.Schedule;
 import arden.runtime.ArdenBoolean;
 import arden.runtime.ArdenEvent;
 import arden.runtime.ArdenTime;
@@ -19,10 +25,12 @@ public class ScenarioEngine {
 	private ArdenValue conclude;
 	private ArdenValue[] returnValues;
 	private boolean isTriggered = false;
+	private Schedule schedule;
 
 	public ScenarioEngine(ScenarioExecutionContext context, MedicalLogicModule mlmUnderTest) {
 		this.context = context;
 		this.mlmUnderTest = mlmUnderTest;
+		scheduleAndCall();
 	}
 
 	public void callMlm(ArdenValue[] args) {
@@ -35,7 +43,7 @@ public class ScenarioEngine {
 
 		ArdenEvent event;
 		if (primaryTime == null) {
-			event = new ArdenEvent(mapping);
+			event = new ArdenEvent(mapping, context.getCurrentTime().value);
 		} else if (eventTime == null) {
 			event = new ArdenEvent(mapping, primaryTime.value);
 		} else {
@@ -47,9 +55,9 @@ public class ScenarioEngine {
 			for (Trigger trigger : triggers) {
 				trigger.scheduleEvent(event);
 				if (trigger.runOnEvent(event)) {
+					resetCapturedOutput();
 					isTriggered = true;
 					doCallMlm(null, trigger);
-					return;
 				}
 			}
 		} catch (InvocationTargetException e) {
@@ -60,18 +68,30 @@ public class ScenarioEngine {
 	public void setTime(ArdenTime currentTime) {
 		resetCapturedOutput();
 		context.setCurrentTime(currentTime);
-		try {
-			Trigger[] triggers = mlmUnderTest.getTriggers(context);
-			for (Trigger trigger : triggers) {
-				ArdenTime nextRunTime = trigger.getNextRunTime();
-				if (nextRunTime != null && nextRunTime.value - currentTime.value <= 0) {
+		scheduleAndCall();
+	}
+
+	private void scheduleAndCall() {
+		Schedule additionalSchedule = Schedule.create(context, Arrays.asList(mlmUnderTest));
+		if (schedule == null) {
+			schedule = additionalSchedule;
+		} else {
+			schedule.add(additionalSchedule);
+		}
+
+		for (Entry<ArdenTime, Queue<Call>> entry : schedule.entrySet()) {
+			ArdenTime nextRuntime = entry.getKey();
+			Queue<Call> calls = entry.getValue();
+			final long delay = nextRuntime.value - context.getCurrentTime().value;
+			if (delay <= 0) {
+				for (Call call : calls) {
+					MlmCall mlmCall = (MlmCall) call;
+					resetCapturedOutput();
 					isTriggered = true;
-					doCallMlm(null, trigger);
-					return;
+					doCallMlm(null, mlmCall.trigger);
 				}
+				schedule.pollFirstEntry();
 			}
-		} catch (InvocationTargetException e) {
-			throw new AssertionError("Could not create MLM instance", e);
 		}
 	}
 
@@ -91,6 +111,7 @@ public class ScenarioEngine {
 				returnValues = instance.action(context);
 			} else {
 				conclude = ArdenBoolean.create(false, ArdenValue.NOPRIMARYTIME);
+				returnValues = null;
 			}
 		} catch (InvocationTargetException e) {
 			throw new AssertionError("Could not create MLM instance", e);
@@ -120,8 +141,6 @@ public class ScenarioEngine {
 			}
 		}
 	}
-
-	// TODO method to remove checked return values?
 
 	public ArdenValue[] getReturnedValues() {
 		Assert.assertNotNull("Nothing was returned", returnValues);
