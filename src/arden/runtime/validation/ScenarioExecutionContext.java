@@ -28,23 +28,28 @@ import arden.runtime.evoke.Trigger;
 
 public class ScenarioExecutionContext extends BaseExecutionContext {
 	// configuration
-	Map<String, ArdenValue[]> queries = new HashMap<>();
-	Map<String, ArdenValue[]> interfaces = new HashMap<>();
-	ArdenTime currentTime;
+	private Map<String, ArdenValue[]> queries = new HashMap<>();
+	private Map<String, ArdenValue[]> interfaces = new HashMap<>();
+	private boolean warningsEnabled = true;
+	private ArdenTime currentTime;
 	{
 		Calendar calendar = Calendar.getInstance();
 		calendar.clear();
-		calendar.set(1900, 0, 0, 0, 0, 0);
+		calendar.set(1800, Calendar.JANUARY, 1, 0, 0, 0);
 		currentTime = new ArdenTime(calendar.getTimeInMillis());
 	}
 
 	// captured output
-	List<WrittenMessage> writtenMessages = new ArrayList<>();
-	List<MlmCall> mlmCalls = new ArrayList<>();
-	List<EventCall> eventCalls = new ArrayList<>();
+	private List<WrittenMessage> writtenMessages = new ArrayList<>();
+	private List<MlmCall> mlmCalls = new ArrayList<>();
+	private List<EventCall> eventCalls = new ArrayList<>();
 
 	public ScenarioExecutionContext() {
 		super(((URLClassLoader) (Thread.currentThread().getContextClassLoader())).getURLs());
+	}
+
+	public void showWarnings(boolean show) {
+		warningsEnabled = show;
 	}
 
 	public void setCurrentTime(ArdenTime time) {
@@ -90,7 +95,6 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 			Assert.assertFalse("No MLM(s) where called", mlmCalls.isEmpty());
 			Assert.assertFalse("No Event(s) where called", eventCalls.isEmpty());
 		} else {
-			// TODO output mlms / events
 			Assert.assertTrue("MLM(s) have been called", mlmCalls.isEmpty());
 			Assert.assertTrue("Event(s) have been called", eventCalls.isEmpty());
 		}
@@ -102,12 +106,9 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 		if (not) {
 			Assert.assertTrue("Nothing was written", messages.length != 0);
 		} else {
-			// TODO output messages
 			Assert.assertTrue("Message(s) have been written", messages.length == 0);
 		}
 	}
-
-	// TODO method to remove checked messages?
 
 	public ArdenValue[] getWrittenMessages(String destination) {
 		List<ArdenValue> values = new ArrayList<>();
@@ -125,7 +126,10 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 	public DatabaseQuery createQuery(String mapping) {
 		ArdenValue[] values = queries.get(mapping);
 		if (values == null) {
-			throw new AssertionError("The result for the {" + mapping + "} query is not defined.");
+			if (warningsEnabled) {
+				System.err.println("Warning: The result for the {" + mapping + "} query is not defined.");
+			}
+			return DatabaseQuery.NULL;
 		}
 		return new MemoryQuery(values);
 	}
@@ -181,7 +185,9 @@ public class ScenarioExecutionContext extends BaseExecutionContext {
 			public ArdenValue[] run(ExecutionContext context, ArdenValue[] arguments, Trigger trigger)
 					throws InvocationTargetException {
 				if (values == null) {
-					System.err.println("Warning: the result for the {" + mapping + "} interface is not defined.");
+					if (warningsEnabled) {
+						System.err.println("Warning: the result for the {" + mapping + "} interface is not defined.");
+					}
 					return new ArdenValue[] { ArdenNull.INSTANCE };
 				}
 				return values;

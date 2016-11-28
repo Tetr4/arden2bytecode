@@ -30,6 +30,17 @@ public class ScenarioEngine {
 	public ScenarioEngine(ScenarioExecutionContext context, MedicalLogicModule mlmUnderTest) {
 		this.context = context;
 		this.mlmUnderTest = mlmUnderTest;
+
+		// initialize the triggers, which may call methods on the context,
+		// therefore disable warnings
+		context.showWarnings(false);
+		try {
+			mlmUnderTest.getTriggers(context);
+		} catch (InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
+		context.showWarnings(true);
+
 		scheduleAndCall();
 	}
 
@@ -40,7 +51,6 @@ public class ScenarioEngine {
 
 	public void callEvent(String mapping, ArdenTime primaryTime, ArdenTime eventTime) {
 		resetCapturedOutput();
-
 		ArdenEvent event;
 		if (primaryTime == null) {
 			event = new ArdenEvent(mapping, context.getCurrentTime().value);
@@ -49,7 +59,6 @@ public class ScenarioEngine {
 		} else {
 			event = new ArdenEvent(mapping, primaryTime.value, eventTime.value);
 		}
-
 		try {
 			Trigger[] triggers = mlmUnderTest.getTriggers(context);
 			for (Trigger trigger : triggers) {
@@ -78,7 +87,6 @@ public class ScenarioEngine {
 		} else {
 			schedule.add(additionalSchedule);
 		}
-
 		for (Entry<ArdenTime, Queue<Call>> entry : schedule.entrySet()) {
 			ArdenTime nextRuntime = entry.getKey();
 			Queue<Call> calls = entry.getValue();
