@@ -248,7 +248,7 @@ public class ValidationTest extends ImplementationTest {
 	public void testPrimaryTimeConstructionAgo() throws Exception {
 		expectSuccess("x := READ {X};", "", "RETURN TIME OF x;",
 				"WHEN NOW IS 2000-01-01;"
-			  +	"GIVEN {X} IS TRUE|(1 YEAR AGO);"
+			  +	"GIVEN {X} IS TRUE|1 YEAR AGO;"
 			  + "WHEN THE MLM IS CALLED;"
 		      + "THEN 1999-01-01 SHOULD BE RETURNED;");
 	}

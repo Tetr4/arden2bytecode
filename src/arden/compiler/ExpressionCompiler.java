@@ -585,11 +585,12 @@ class ExpressionCompiler extends VisitorBase {
 	}
 
 	// expr_power =
-	// {before} expr_before
+	// {constr}  expr_construct
 	// | {exp} [base]:expr_function dexp [exp]:expr_function;
 	@Override
-	public void caseABeforeExprPower(ABeforeExprPower node) {
-		node.getExprBefore().apply(this);
+	public void caseAConstrExprPower(AConstrExprPower node) {
+		// expr_power = {constr} expr_construct
+		node.getExprConstruct().apply(this);
 	}
 
 	@Override
@@ -598,6 +599,20 @@ class ExpressionCompiler extends VisitorBase {
 		// Exponent (second arguement) must be an expression that evaluates to a
 		// scalar number
 		invokeOperator(BinaryOperator.POW, node.getBase(), node.getExp());
+	}
+
+	@Override
+	public void caseABeforeExprConstruct(ABeforeExprConstruct node) {
+		// expr_construct = {before} expr_before
+		node.getExprBefore().apply(this);
+	}
+
+	@Override
+	public void caseAPipeExprConstruct(APipeExprConstruct node) {
+		// expr_construct = {pipe} expr_factor pipe [time]:expr_before;
+		node.getExprBefore().apply(this);
+		node.getTime().apply(this);
+		context.writer.invokeStatic(Compiler.getRuntimeHelper("changeTime", ArdenValue.class, ArdenValue.class));
 	}
 
 	// expr_before =
@@ -800,13 +815,13 @@ class ExpressionCompiler extends VisitorBase {
 	@Override
 	public void caseAExpfExprFactor(AExpfExprFactor node) {
 		// expr_factor = {expf} expr_construct
-		node.getExprConstruct().apply(this);
+		node.getExprFactorAtom().apply(this);
 	}
 
 	@Override
 	public void caseAEfeExprFactor(AEfeExprFactor node) {
-		// expr_factor = {efe} expr_construct l_brk expr r_brk
-		node.getExprConstruct().apply(this);
+		// expr_factor = {efe} expr_factor_atom l_brk expr r_brk
+		node.getExprFactorAtom().apply(this);
 		node.getExpr().apply(this);
 		context.writer.invokeStatic(getMethod("elementAt", ArdenValue.class, ArdenValue.class));
 	}
@@ -817,20 +832,6 @@ class ExpressionCompiler extends VisitorBase {
 		node.getExprFactor().apply(this);
 		context.writer.loadStringConstant(node.getIdentifier().getText().toUpperCase(Locale.ENGLISH));
 		context.writer.invokeStatic(Compiler.getRuntimeHelper("getObjectMember", ArdenValue.class, String.class));
-	}
-	
-	@Override
-	public void caseAExpfExprConstruct(AExpfExprConstruct node) {
-		// expr_construct = {expf} expr_factor_atom
-		node.getExprFactorAtom().apply(this);
-	}
-	
-	@Override
-	public void caseAPipeExprConstruct(APipeExprConstruct node) {
-		// expr_construct = {pipe} expr_factor_atom pipe [time]:expr_factor_atom
-		node.getExprFactorAtom().apply(this);
-		node.getTime().apply(this);
-		context.writer.invokeStatic(Compiler.getRuntimeHelper("changeTime", ArdenValue.class, ArdenValue.class));
 	}
 
 	// expr_factor_atom =

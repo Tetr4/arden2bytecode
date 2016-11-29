@@ -889,10 +889,15 @@ expr_times =
     | {dpow}    expr_times div expr_power;
 
 expr_power =
-      {before}  expr_before
+      {constr}  expr_construct
     | {exp}     [base]:expr_function dexp [exp]:expr_function;
                   /* Exponent (second arguement) must be an expression that */
                   /* evaluates to a scalar number                           */
+
+expr_construct =
+      {before}    expr_before
+//    | {pipeappl}    expr_before pipe [time]:expr_before [pipe2]:pipe [applicability]:expr_function
+    | {pipe}    expr_before pipe [time]:expr_before;
 
 expr_before =
       {ago}     expr_ago
@@ -924,14 +929,10 @@ expr_function =
     | {attr}    attribute expr_factor from expr_function;
 
 expr_factor =
-      {expf}   expr_construct
-    | {efe}    expr_construct l_brk expr r_brk
+      {expf}   expr_factor_atom
+    | {efe}    expr_factor_atom l_brk expr r_brk
     | {dot}    expr_factor dot identifier;
-    
-expr_construct = 
-      {expf}    expr_factor_atom
-//    | {appl}    expr_factor_atom pipe [time]:expr_factor_atom [pipe2]:pipe [applicability]:boolean_value
-    | {pipe}    expr_factor_atom pipe [time]:expr_factor_atom;
+
 
 expr_factor_atom =
       {id}      identifier

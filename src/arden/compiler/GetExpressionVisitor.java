@@ -28,7 +28,24 @@
 package arden.compiler;
 
 import arden.compiler.analysis.AnalysisAdapter;
-import arden.compiler.node.*;
+import arden.compiler.node.AAgoExprBefore;
+import arden.compiler.node.AAndExprOr;
+import arden.compiler.node.ABeforeExprConstruct;
+import arden.compiler.node.ACompExprNot;
+import arden.compiler.node.AConstrExprPower;
+import arden.compiler.node.AExpfExprFactor;
+import arden.compiler.node.AExprExprFunction;
+import arden.compiler.node.AFuncExprAgo;
+import arden.compiler.node.ANotExprAnd;
+import arden.compiler.node.AOrExprRange;
+import arden.compiler.node.APlusExprString;
+import arden.compiler.node.APowerExprTimes;
+import arden.compiler.node.ARangeExprWhere;
+import arden.compiler.node.ASortExpr;
+import arden.compiler.node.AStrExprComparison;
+import arden.compiler.node.ATimesExprPlus;
+import arden.compiler.node.AWhereExprSort;
+import arden.compiler.node.Node;
 
 /**
  * Retrieves the first concrete expression node.
@@ -100,7 +117,12 @@ final class GetExpressionVisitor extends AnalysisAdapter {
 	}
 
 	@Override
-	public void caseABeforeExprPower(ABeforeExprPower node) {
+	public void caseAConstrExprPower(AConstrExprPower node) {
+		node.getExprConstruct().apply(this);
+	}
+
+	@Override
+	public void caseABeforeExprConstruct(ABeforeExprConstruct node) {
 		node.getExprBefore().apply(this);
 	}
 
@@ -121,16 +143,6 @@ final class GetExpressionVisitor extends AnalysisAdapter {
 
 	@Override
 	public void caseAExpfExprFactor(AExpfExprFactor node) {
-		node.getExprConstruct().apply(this);
-	}
-	
-	@Override
-	public void caseAExpfExprConstruct(AExpfExprConstruct node) {
-		node.getExprFactorAtom().apply(this);
-	}
-	
-	@Override
-	public void caseAPipeExprConstruct(APipeExprConstruct node) {
 		node.getExprFactorAtom().apply(this);
 	}
 }
