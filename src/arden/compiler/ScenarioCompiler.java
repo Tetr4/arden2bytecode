@@ -201,7 +201,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		// given_phrase = {ass} read? mapping_factor P.is expr
 		context.writer.loadVariable(contextVar);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
+		new ScenarioExpressionsCompiler(context, contextVar).buildArrayForCommaSeparatedExpression(node.getExpr());
 		context.writer.invokeInstance(ScenarioMethods.setQuery);
 	}
 
@@ -210,7 +210,7 @@ public final class ScenarioCompiler extends VisitorBase {
 		// given_phrase = {iass} interface mapping_factor P.is expr
 		context.writer.loadVariable(contextVar);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
+		new ScenarioExpressionsCompiler(context, contextVar).buildArrayForCommaSeparatedExpression(node.getExpr());
 		context.writer.invokeInstance(ScenarioMethods.setInterface);
 	}
 
@@ -228,7 +228,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	public void caseACallargsWhenPhrase(ACallargsWhenPhrase node) {
 		// when_phrase = {callargs} T.mlm P.is called with expr
 		context.writer.loadVariable(engineVar);
-		new ExpressionCompiler(context).buildArrayForCommaSeparatedExpression(node.getExpr());
+		new ScenarioExpressionsCompiler(context, contextVar).buildArrayForCommaSeparatedExpression(node.getExpr());
 		context.writer.invokeInstance(ScenarioMethods.callMlm);
 	}
 
@@ -345,7 +345,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 
 	private void checkConclude(PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -387,7 +387,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 
 	private void checkNotConclude(PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -491,7 +491,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 	
 	private void checkNotReturnExpression(final Label success, PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -526,7 +526,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 
 	private void checkReturnExpression(PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -657,7 +657,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 	
 	private void checkMessageWritten(final Label success, PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -693,7 +693,7 @@ public final class ScenarioCompiler extends VisitorBase {
 	}
 
 	private void checkNotMessageWritten(final Label fail, PExprAny expr) {
-		expr.apply(new ExpressionCompiler(context) {
+		expr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 			@Override
 			public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -923,7 +923,7 @@ public final class ScenarioCompiler extends VisitorBase {
 
 		for (PExprAny argExpr : args) {
 			
-			argExpr.apply(new ExpressionCompiler(context) {
+			argExpr.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 				@Override
 				public void caseAConcreteExprAny(AConcreteExprAny node) {
@@ -976,7 +976,7 @@ public final class ScenarioCompiler extends VisitorBase {
 			context.writer.invokeStatic(ScenarioMethods.isZeroDelay);
 			context.writer.jumpIfZero(fail); // delay not equal
 		} else {
-			delay.apply(new ExpressionCompiler(context) {
+			delay.apply(new ScenarioExpressionsCompiler(context, contextVar) {
 
 				@Override
 				public void caseAConcreteExprAny(AConcreteExprAny node) {
