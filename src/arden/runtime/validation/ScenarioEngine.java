@@ -49,15 +49,22 @@ public class ScenarioEngine {
 		doCallMlm(args, new CallTrigger());
 	}
 
-	public void callEvent(String mapping, ArdenTime primaryTime, ArdenTime eventTime) {
+	public void callEvent(String mapping, ArdenValue primaryTime, ArdenValue eventTime) {
 		resetCapturedOutput();
+		if (primaryTime != null && ! (primaryTime instanceof ArdenTime)) {
+			throw new RuntimeException("Primarytime for event" + mapping + "is not a time value.");
+		}
+		if (eventTime != null && ! (eventTime instanceof ArdenTime)) {
+			throw new RuntimeException("EVENTTIME for event" + mapping + "is not a time value.");
+		}
+
 		ArdenEvent event;
 		if (primaryTime == null) {
 			event = new ArdenEvent(mapping, context.getCurrentTime().value);
 		} else if (eventTime == null) {
-			event = new ArdenEvent(mapping, primaryTime.value);
+			event = new ArdenEvent(mapping, ((ArdenTime) primaryTime).value);
 		} else {
-			event = new ArdenEvent(mapping, primaryTime.value, eventTime.value);
+			event = new ArdenEvent(mapping, ((ArdenTime) primaryTime).value, ((ArdenTime) eventTime).value);
 		}
 		try {
 			Trigger[] triggers = mlmUnderTest.getTriggers(context);
@@ -74,9 +81,13 @@ public class ScenarioEngine {
 		}
 	}
 
-	public void setTime(ArdenTime currentTime) {
+	public void setTime(ArdenValue currentTime) {
 		resetCapturedOutput();
-		context.setCurrentTime(currentTime);
+		if (currentTime instanceof ArdenTime) {
+			context.setCurrentTime((ArdenTime) currentTime);
+		} else {
+			throw new RuntimeException("The value <" + currentTime + "> is not a valid time.");
+		}
 		scheduleAndCall();
 	}
 

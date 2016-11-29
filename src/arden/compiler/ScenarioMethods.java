@@ -5,7 +5,6 @@ import java.lang.reflect.Method;
 
 import org.junit.Assert;
 
-import arden.runtime.ArdenTime;
 import arden.runtime.ArdenValue;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.validation.Call;
@@ -60,8 +59,8 @@ final class ScenarioMethods {
 			getReturnedValues = ScenarioEngine.class.getMethod("getReturnedValues");
 			getConclude = ScenarioEngine.class.getMethod("getConclude");
 			callMlm = ScenarioEngine.class.getMethod("callMlm", ArdenValue[].class);
-			callEvent = ScenarioEngine.class.getMethod("callEvent", String.class, ArdenTime.class, ArdenTime.class);
-			setTime = ScenarioEngine.class.getMethod("setTime", ArdenTime.class);
+			callEvent = ScenarioEngine.class.getMethod("callEvent", String.class, ArdenValue.class, ArdenValue.class);
+			setTime = ScenarioEngine.class.getMethod("setTime", ArdenValue.class);
 			
 			callDelay = Call.class.getDeclaredField("delay");
 			callArgs = Call.class.getDeclaredField("args");

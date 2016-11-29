@@ -710,15 +710,11 @@ when_phrase =
       {call} T.mlm P.is called
     | {callargs} T.mlm P.is called with expr
     | {callevt} event? mapping_factor P.is called
-    | {callevttime} event? mapping_factor P.is called with time const_time
-    | {callevttimetime} event? mapping_factor P.is called with time const_time eventtime [eventttime]:const_time
-    | {time} currenttime P.is const_time
-    | {timealias} now P.is const_time;
+    | {callevttime} event? mapping_factor P.is called with time expr
+    | {callevttimetime} event? mapping_factor P.is called with time expr eventtime [eventttime]:expr
+    | {time} currenttime P.is expr
+    | {timealias} now P.is expr;
 
-const_time =
-      {date} iso_date
-    | {dtime} iso_date_time;
-    
 then_phrase =
       {trigger} T.mlm should not? be triggered
     | {conclude} expr_any should not? be concluded

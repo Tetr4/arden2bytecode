@@ -22,8 +22,6 @@ import arden.compiler.node.ACallnothingThenPhrase;
 import arden.compiler.node.ACommavalueExprAnyTail;
 import arden.compiler.node.AConcludeThenPhrase;
 import arden.compiler.node.AConcreteExprAny;
-import arden.compiler.node.ADateConstTime;
-import arden.compiler.node.ADtimeConstTime;
 import arden.compiler.node.AEmptyScenarioBlock;
 import arden.compiler.node.AFilterExprAny;
 import arden.compiler.node.AGblkGivenBlockAnd;
@@ -60,7 +58,6 @@ import arden.compiler.node.AWstmtScenarioBlock;
 import arden.compiler.node.AWstmtWhenBlockAnd;
 import arden.compiler.node.PExprAny;
 import arden.compiler.node.PExprAnyTail;
-import arden.runtime.ArdenTime;
 import arden.runtime.MedicalLogicModule;
 import arden.runtime.validation.Call;
 
@@ -244,39 +241,37 @@ public final class ScenarioCompiler extends VisitorBase {
 
 	@Override
 	public void caseACallevttimeWhenPhrase(ACallevttimeWhenPhrase node) {
-		// when_phrase = {callevttime} event? mapping_factor P.is called with
-		// time const_time
+		// when_phrase = {callevttime} event? mapping_factor P.is called with time expr
 		context.writer.loadVariable(engineVar);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		node.getConstTime().apply(this);
+		node.getExpr().apply(new ScenarioExpressionsCompiler(context, contextVar));
 		context.writer.loadNull();
 		context.writer.invokeInstance(ScenarioMethods.callEvent);
 	}
 
 	@Override
 	public void caseACallevttimetimeWhenPhrase(ACallevttimetimeWhenPhrase node) {
-		// when_phrase = {callevttimetime} event? mapping_factor P.is called
-		// with time const_time eventtime [eventttime]:const_time
+		// when_phrase = {callevttimetime} event? mapping_factor P.is called with time expr eventtime [eventttime]:expr
 		context.writer.loadVariable(engineVar);
 		context.writer.loadStringConstant(ParseHelpers.getStringForMapping(node.getMappingFactor()));
-		node.getConstTime().apply(this);
-		node.getEventttime().apply(this);
+		node.getExpr().apply(new ScenarioExpressionsCompiler(context, contextVar));
+		node.getEventttime().apply(new ScenarioExpressionsCompiler(context, contextVar));
 		context.writer.invokeInstance(ScenarioMethods.callEvent);
 	}
 
 	@Override
 	public void caseATimeWhenPhrase(ATimeWhenPhrase node) {
-		// when_phrase = {time} currenttime P.is const_time
+		// when_phrase = {time} currenttime P.is expr
 		context.writer.loadVariable(engineVar);
-		node.getConstTime().apply(this);
+		node.getExpr().apply(new ScenarioExpressionsCompiler(context, contextVar));
 		context.writer.invokeInstance(ScenarioMethods.setTime);
 	}
 
 	@Override
 	public void caseATimealiasWhenPhrase(ATimealiasWhenPhrase node) {
-		// when_phrase = {timealias} now P.is const_time;
+		// when_phrase = {timealias} now P.is expr;
 		context.writer.loadVariable(engineVar);
-		node.getConstTime().apply(this);
+		node.getExpr().apply(new ScenarioExpressionsCompiler(context, contextVar));
 		context.writer.invokeInstance(ScenarioMethods.setTime);
 	}
 
@@ -307,22 +302,6 @@ public final class ScenarioCompiler extends VisitorBase {
 		context.writer.loadVariable(mlmUnderTestVar);
 	}
 
-	/** Leaves an {@link ArdenTime} on the Stack. */
-	@Override
-	public void caseADateConstTime(ADateConstTime node) {
-		// const_time = {date} iso_date
-		long date = ParseHelpers.parseIsoDate(node.getIsoDate());
-		context.writer.loadStaticField(context.codeGenerator.getTimeLiteral(date));
-	}
-
-	/** Leaves an {@link ArdenTime} on the Stack. */
-	@Override
-	public void caseADtimeConstTime(ADtimeConstTime node) {
-		// const_time = {dtime} iso_date_time
-		long date = ParseHelpers.parseIsoDateTime(node.getIsoDateTime());
-		context.writer.loadStaticField(context.codeGenerator.getTimeLiteral(date));
-	}
-	
 	// then statements
 
 	@Override
