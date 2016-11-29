@@ -827,9 +827,9 @@ class ExpressionCompiler extends VisitorBase {
 	
 	@Override
 	public void caseAPipeExprConstruct(APipeExprConstruct node) {
-		// expr_construct = {pipe} expr_factor_atom pipe time_value
+		// expr_construct = {pipe} expr_factor_atom pipe [time]:expr_factor_atom
 		node.getExprFactorAtom().apply(this);
-		node.getTimeValue().apply(this);
+		node.getTime().apply(this);
 		context.writer.invokeStatic(Compiler.getRuntimeHelper("changeTime", ArdenValue.class, ArdenValue.class));
 	}
 

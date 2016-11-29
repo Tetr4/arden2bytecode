@@ -930,8 +930,8 @@ expr_factor =
     
 expr_construct = 
       {expf}    expr_factor_atom
-//  | {appl} expr_factor_atom pipe time_value pipe [applicability]:boolean_value
-    | {pipe}    expr_factor_atom pipe time_value;
+//    | {appl}    expr_factor_atom pipe [time]:expr_factor_atom [pipe2]:pipe [applicability]:boolean_value
+    | {pipe}    expr_factor_atom pipe [time]:expr_factor_atom;
 
 expr_factor_atom =
       {id}      identifier

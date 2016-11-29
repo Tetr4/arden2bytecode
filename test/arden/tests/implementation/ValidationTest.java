@@ -230,10 +230,27 @@ public class ValidationTest extends ImplementationTest {
 	}
 
 	@Test
-	public void testPrimaryTimeConstructionSuccess() throws Exception {
+	public void testPrimaryTimeConstruction() throws Exception {
 		expectSuccess("RETURN TRUE|2010-01-01;",
 				"WHEN THE MLM IS CALLED;"
 		      + "THEN ANY VALUE WHERE TIME OF IT = 2010-01-01 SHOULD BE RETURNED;");
+	}
+
+	@Test
+	public void testPrimaryTimeConstructionCurrenttime() throws Exception {
+		expectSuccess("x := READ {X};", "", "RETURN TIME OF x;",
+				"GIVEN {X} IS TRUE|CURRENTTIME;"
+			  + "WHEN THE MLM IS CALLED;"
+		      + "THEN 1800-01-01 SHOULD BE RETURNED;");
+	}
+	
+	@Test
+	public void testPrimaryTimeConstructionAgo() throws Exception {
+		expectSuccess("x := READ {X};", "", "RETURN TIME OF x;",
+				"WHEN NOW IS 2000-01-01;"
+			  +	"GIVEN {X} IS TRUE|(1 YEAR AGO);"
+			  + "WHEN THE MLM IS CALLED;"
+		      + "THEN 1999-01-01 SHOULD BE RETURNED;");
 	}
 
 	@Test
